@@ -2,81 +2,91 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Student Council Treasury</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏛️</text></svg>">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
 </head>
 <body class="dark-mode">
 
-    <nav>
+    <header>
         <div class="logo">SC Treasury</div>
-        <div class="nav-links">
-            <button onclick="switchTab('home')">Funds</button>
-            <button onclick="switchTab('be-heard')">Be Heard</button>
-            <button id="confidentialBtn" class="hidden" onclick="switchTab('admin')">Confidential</button>
-            <button id="themeToggle">Light Mode</button>
-            <button id="loginBtn" onclick="openLogin()">Login</button>
-            <button id="logoutBtn" class="hidden" onclick="handleLogout()">Logout</button>
+        <nav>
+            <button onclick="switchTab('home')" class="nav-btn active">Funds</button>
+            <button onclick="switchTab('be-heard')" class="nav-btn">Be Heard</button>
+            <button id="adminToggleBtn" class="nav-btn hidden special" onclick="toggleAdminMode()">Admin Mode: OFF</button>
+        </nav>
+        <div class="header-actions">
+            <button id="loginBtn" onclick="openLogin()">🔒</button>
+            <button id="logoutBtn" class="hidden" onclick="handleLogout()">🔓</button>
         </div>
-    </nav>
+    </header>
 
     <div class="container">
-        <div id="home" class="section active">
+        <div id="home" class="tab-content active">
+            
             <div class="balance-card">
-                <h3>Current Balance (PHP)</h3>
-                <div class="balance-amount">₱<span id="displayBalance">0.00</span></div>
+                <div class="label">Total Funds Available</div>
+                <div class="amount">₱<span id="displayBalance">0.00</span></div>
+                <button id="addTransBtn" class="action-btn hidden" onclick="openTransactionModal()">+ Add New</button>
             </div>
 
-            <div class="history-container">
-                <h3>Transaction History</h3>
-                <table id="transTable">
-                    <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Description</th>
-                            <th>Type</th>
-                            <th>Amount</th>
-                        </tr>
-                    </thead>
-                    <tbody id="transList"></tbody>
-                </table>
-                <button id="loadMoreBtn" onclick="loadMore()">Show more</button>
+            <div class="list-header">
+                <h3>Latest Transactions</h3>
+                <span id="transCount" style="font-size: 0.8rem; opacity: 0.7">Loading...</span>
             </div>
+
+            <div id="transList" class="transaction-list">
+                </div>
+
+            <button id="loadMoreBtn" class="load-more" onclick="loadMore()">View More History</button>
         </div>
 
-        <div id="be-heard" class="section hidden">
-            <h2>Be Heard</h2>
-            <p>Students can suggest where funds should go next.</p>
-            </div>
-
-        <div id="admin" class="section hidden">
-            <h2>Confidential Admin Panel</h2>
-            <div class="admin-form">
-                <input type="date" id="tDate">
-                <input type="text" id="tDesc" placeholder="Description">
-                <select id="tType">
-                    <option value="income">Income (Add Fund)</option>
-                    <option value="expense">Expense (Use Fund)</option>
-                </select>
-                <input type="number" id="tAmount" placeholder="Amount">
-                <button onclick="addTransaction()">Submit Transaction</button>
+        <div id="be-heard" class="tab-content hidden">
+            <div class="placeholder-box">
+                <h2>📢 Be Heard</h2>
+                <p>This feature is coming soon.</p>
             </div>
         </div>
     </div>
 
     <div id="loginModal" class="modal">
-        <div class="modal-content">
-            <span class="close" onclick="closeLogin()">&times;</span>
-            <h2>Admin Verification</h2>
+        <div class="modal-box">
+            <span class="close-btn" onclick="closeModal('loginModal')">&times;</span>
+            <h2>Treasurer Access</h2>
             <input type="text" id="adminUser" placeholder="Username">
             <input type="password" id="adminPass" placeholder="Password">
-            <button onclick="attemptLogin()">Verify</button>
+            <button class="primary-btn" onclick="attemptLogin()">Verify Identity</button>
+        </div>
+    </div>
+
+    <div id="transModal" class="modal">
+        <div class="modal-box">
+            <span class="close-btn" onclick="closeModal('transModal')">&times;</span>
+            <h2 id="modalTitle">New Transaction</h2>
+            <input type="hidden" id="editId"> <label>Date</label>
+            <input type="date" id="tDate">
+            
+            <label>Description</label>
+            <input type="text" id="tDesc" placeholder="What was this for?">
+            
+            <label>Type</label>
+            <div class="toggle-group">
+                <button id="btnIncome" class="type-btn active" onclick="setTransType('income')">Income</button>
+                <button id="btnExpense" class="type-btn" onclick="setTransType('expense')">Expense</button>
+            </div>
+            
+            <label>Amount (PHP)</label>
+            <input type="number" id="tAmount" placeholder="0.00">
+
+            <button class="primary-btn" onclick="submitTransaction()">Save Transaction</button>
+            <button id="deleteBtn" class="delete-btn hidden" onclick="deleteTransaction()">Delete Record</button>
         </div>
     </div>
 
     <div id="toast" class="toast"></div>
-
     <script src="script.js"></script>
 </body>
 </html>

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Student Council Treasury</title>
+    <title>Student Council Public Funds</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
@@ -11,7 +11,7 @@
 <body class="dark-mode">
 
     <header>
-        <div class="logo">SC Treasury</div>
+        <div class="logo">SC Funds</div>
         <nav>
             <button onclick="switchTab('home')" class="nav-btn active">Funds</button>
             <button onclick="switchTab('be-heard')" class="nav-btn">Be Heard</button>
@@ -76,7 +76,7 @@
     <div id="loginModal" class="modal">
         <div class="modal-box">
             <span class="close-btn" onclick="closeModal('loginModal')">&times;</span>
-            <h2>Treasurer Access</h2>
+            <h2>Login</h2>
             <input type="text" id="adminUser" placeholder="Username">
             <input type="password" id="adminPass" placeholder="Password">
             <button class="primary-btn" onclick="attemptLogin()">Verify Identity</button>
@@ -108,3 +108,4 @@
     <script src="script.js"></script>
 </body>
 </html>
+

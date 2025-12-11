@@ -1,3 +1,8 @@
+/* --- GLOBAL RESET & BOX SIZING (The Fix) --- */
+* {
+    box-sizing: border-box; /* This prevents inputs from overflowing! */
+}
+
 :root {
     /* Default Dark Mode */
     --bg: #121212;
@@ -15,7 +20,7 @@
 body.light-mode {
     --bg: #f3f4f6;
     --card: #ffffff;
-    --text: #1f2937;
+    --text: #1f2937; /* Almost Black */
     --text-sub: #6b7280;
     --border: #e5e7eb;
     --filter-bg: #e5e7eb;
@@ -54,7 +59,17 @@ header {
 .nav-btn.special { color: #eab308; }
 
 .header-actions { display: flex; gap: 10px; align-items: center; }
-.header-actions button { background: none; border: none; cursor: pointer; padding: 5px; }
+
+/* Logout & Header Buttons */
+.header-actions button { 
+    background: none; 
+    border: none; 
+    cursor: pointer; 
+    padding: 5px;
+    color: var(--text); /* Forces Black/White based on theme */
+    font-weight: 600;
+    font-size: 0.9rem;
+}
 
 .container { max-width: 600px; margin: 0 auto; padding: 20px; }
 
@@ -98,14 +113,14 @@ header {
 .income { color: var(--green); }
 .expense { color: var(--red); }
 
-/* Theme Toggle Icon (Pure CSS Circle) */
+/* Theme Toggle Icon */
 .theme-icon {
     width: 20px; height: 20px; border-radius: 50%;
-    background: linear-gradient(45deg, #f39c12, #f1c40f); /* Sun color */
+    background: linear-gradient(45deg, #f39c12, #f1c40f);
     border: 2px solid var(--bg);
 }
 body.light-mode .theme-icon {
-    background: #555; /* Moon/Dark color */
+    background: #555;
 }
 
 /* Modal */
@@ -113,7 +128,20 @@ body.light-mode .theme-icon {
 .modal-box { background: var(--card); width: 100%; max-width: 500px; padding: 25px; border-radius: 20px 20px 0 0; animation: slideUp 0.3s; padding-bottom: 40px; }
 @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
 
-input { width: 100%; padding: 15px; margin: 10px 0 20px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 1rem; }
+/* Inputs - Strictly Controlled */
+input { 
+    width: 100%; 
+    padding: 15px; 
+    margin: 10px 0 20px; 
+    background: var(--bg); 
+    border: 1px solid var(--border); 
+    border-radius: 8px; 
+    color: var(--text); 
+    font-size: 1rem; 
+    outline: none;
+}
+input:focus { border-color: var(--primary); }
+
 .primary-btn { width: 100%; padding: 15px; background: var(--primary); color: white; border: none; border-radius: 10px; font-weight: bold; font-size: 1rem; cursor: pointer; }
 .action-btn { padding: 10px 20px; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: white; border-radius: 20px; cursor: pointer; }
 .delete-btn { background: var(--red); margin-top: 10px; width: 100%; padding: 15px; color: white; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; }

@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Student Council Treasury</title>
     <link rel="stylesheet" href="style.css">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏛️</text></svg>">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
 </head>
@@ -19,8 +18,17 @@
             <button id="adminToggleBtn" class="nav-btn hidden special" onclick="toggleAdminMode()">Admin Mode: OFF</button>
         </nav>
         <div class="header-actions">
-            <button id="loginBtn" onclick="openLogin()">🔒</button>
-            <button id="logoutBtn" class="hidden" onclick="handleLogout()">🔓</button>
+            <button id="themeBtn" onclick="toggleTheme()" title="Switch Theme">
+                <div class="theme-icon"></div>
+            </button>
+            
+            <button id="loginBtn" onclick="openLogin()" title="Admin Login">
+                <img src="img/adminico.png" alt="Login" class="icon-img">
+            </button>
+            
+            <button id="logoutBtn" class="hidden" onclick="handleLogout()" title="Logout">
+                Logout
+            </button>
         </div>
     </header>
 
@@ -33,14 +41,16 @@
                 
                 <div id="adminControls" class="hidden" style="margin-top: 15px; display: flex; gap: 10px; justify-content: center;">
                     <button class="action-btn" onclick="openTransactionModal()">+ Add New</button>
-                    <button class="action-btn" style="background: #27ae60;" onclick="downloadBackup()">⬇️ Download CSV</button>
+                    <button class="action-btn" style="background: #27ae60;" onclick="downloadBackup()">Download CSV</button>
                 </div>
             </div>
 
             <div class="list-header">
                 <div style="display: flex; align-items: center; gap: 10px;">
                     <h3>Latest Transactions</h3>
-                    <button class="filter-icon" onclick="toggleFilterMenu()" title="Filter by Date">📅</button>
+                    <button class="filter-btn" onclick="toggleFilterMenu()">
+                        <img id="sortIcon" src="img/sortdm.png" alt="Filter" class="icon-img">
+                    </button>
                 </div>
                 <span id="transCount" style="font-size: 0.8rem; opacity: 0.7">Loading...</span>
             </div>
@@ -81,7 +91,7 @@
             <label>Date</label>
             <input type="date" id="tDate">
             <label>Description</label>
-            <input type="text" id="tDesc" placeholder="What was this for?">
+            <input type="text" id="tDesc" placeholder="Description">
             <label>Type</label>
             <div class="toggle-group">
                 <button id="btnIncome" class="type-btn active" onclick="setTransType('income')">Income</button>

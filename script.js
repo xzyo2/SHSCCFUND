@@ -3,24 +3,24 @@ const SUPABASE_URL = 'https://tokedafadxogunwwetef.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRva2VkYWZhZHhvZ3Vud3dldGVmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0Mzc4NTUsImV4cCI6MjA4MTAxMzg1NX0.HBS6hfKXt2g3oplwYoCg2t7qjqFyDMJvEmtlvgJSb3c';
 const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+
 // --- STATE VARIABLES ---
 let transactions = [];
 let currentPage = 0;
 let isAdminMode = false;
-let selectedType = 'income'; // For the modal form
+let selectedType = 'income';
 
 // --- INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', () => {
     fetchTransactions();
-    setupRealtime();
+    setupRealtime(); // Start listening immediately
     checkLoginSession();
     
-    // Set default date to today for new entries
     const dateInput = document.getElementById('tDate');
     if(dateInput) dateInput.valueAsDate = new Date();
 });
 
-// --- DATA FETCHING (READ ONLY) ---
+// --- DATA FETCHING ---
 async function fetchTransactions(isLoadMore = false) {
     if (!isLoadMore) { 
         currentPage = 0; 
@@ -30,12 +30,11 @@ async function fetchTransactions(isLoadMore = false) {
     const from = currentPage * 10;
     const to = from + 9;
 
-    // Fetch data from Supabase (Public Read Access)
     const { data, error, count } = await client
         .from('transactions')
         .select('*', { count: 'exact' })
         .order('date', { ascending: false })
-        .order('id', { ascending: false }) // Secondary sort by ID so newest is top
+        .order('id', { ascending: false })
         .range(from, to);
 
     if (error) {
@@ -43,21 +42,14 @@ async function fetchTransactions(isLoadMore = false) {
         return showToast("Error loading data");
     }
 
-    // Append new data or replace existing
     transactions = isLoadMore ? [...transactions, ...data] : data;
-    
-    // Render the cards
     data.forEach(t => renderCard(t));
-    
-    // Update the Balance Board
     calculateBalance();
     
-    // Update UI counters
     if(document.getElementById('transCount')) {
         document.getElementById('transCount').innerText = `${count} records`;
     }
     
-    // Handle "Load More" button visibility
     const loadBtn = document.getElementById('loadMoreBtn');
     if(loadBtn) {
         loadBtn.style.display = (to >= count - 1) ? 'none' : 'block';
@@ -87,21 +79,20 @@ function renderCard(t) {
     list.appendChild(card);
 }
 
-// --- SECURE DB ACTIONS (WRITE via SERVER) ---
+// --- SECURE DB ACTIONS (Server-Side) ---
 
 async function submitTransaction() {
     const id = document.getElementById('editId').value;
     const date = document.getElementById('tDate').value;
     const desc = document.getElementById('tDesc').value;
     const amount = document.getElementById('tAmount').value;
-    // We need the password currently in the login box to authorize the write
     const password = document.getElementById('adminPass').value; 
 
     if (!desc || !amount) return showToast("Please fill all fields");
-    if (!password) return showToast("Please login again to save (Security Check)");
+    if (!password) return showToast("Please login again to save");
 
     const payload = { 
-        id: id ? id : undefined, // Only send ID if editing
+        id: id ? id : undefined, 
         date, 
         description: desc, 
         type: selectedType, 
@@ -111,7 +102,6 @@ async function submitTransaction() {
     const action = id ? 'update' : 'create';
 
     try {
-        // Send data to Vercel Server (Hidden API) instead of direct Supabase
         const res = await fetch('/api/transaction', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -121,9 +111,9 @@ async function submitTransaction() {
         const result = await res.json();
 
         if (result.success) {
-            showToast("Success!");
+            showToast("Success! Waiting for update...");
             closeModal('transModal');
-            // The Realtime listener will auto-refresh the list
+            // We DO NOT fetch here. We wait for Realtime to trigger it.
         } else {
             showToast("Error: " + (result.message || result.error));
         }
@@ -138,7 +128,7 @@ async function deleteTransaction() {
     const password = document.getElementById('adminPass').value;
 
     if(!confirm("Are you sure you want to delete this?")) return;
-    if (!password) return showToast("Please login again (Security Check)");
+    if (!password) return showToast("Please login again");
 
     try {
         const res = await fetch('/api/transaction', {
@@ -149,15 +139,35 @@ async function deleteTransaction() {
 
         const result = await res.json();
         if (result.success) {
-            showToast("Deleted.");
+            showToast("Deleted. Waiting for update...");
             closeModal('transModal');
-            // Realtime listener will handle refresh
+            // We DO NOT fetch here. We wait for Realtime to trigger it.
         } else {
             showToast("Error deleting: " + result.message);
         }
     } catch (e) {
         showToast("Server Connection Failed");
     }
+}
+
+// --- REALTIME LISTENER (The Important Part) ---
+function setupRealtime() {
+    // 1. Subscribe to the 'transactions' table
+    const channel = client.channel('public:transactions')
+    .on(
+        'postgres_changes', 
+        { event: '*', schema: 'public', table: 'transactions' }, 
+        (payload) => {
+            console.log('Database changed!', payload);
+            // 2. When the DB says "I changed", we reload the list
+            fetchTransactions(); 
+        }
+    )
+    .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+            console.log('Realtime connection active!');
+        }
+    });
 }
 
 // --- ADMIN & UI LOGIC ---
@@ -182,7 +192,6 @@ function toggleAdminMode() {
 }
 
 function openTransactionModal() {
-    // Reset form for "Add" mode
     document.getElementById('modalTitle').innerText = "New Transaction";
     document.getElementById('editId').value = "";
     document.getElementById('tDesc').value = "";
@@ -193,11 +202,9 @@ function openTransactionModal() {
 }
 
 function openEditModal(id) {
-    // Find data locally first to fill the form
     const t = transactions.find(x => x.id === id);
     if(!t) return;
 
-    // Fill form for "Edit" mode
     document.getElementById('modalTitle').innerText = `Edit Transaction #${id}`;
     document.getElementById('editId').value = id;
     document.getElementById('tDate').value = t.date;
@@ -220,7 +227,6 @@ async function attemptLogin() {
     const p = document.getElementById('adminPass').value;
     
     try {
-        // Authenticate via Vercel Server
         const res = await fetch('/api/auth', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
@@ -233,8 +239,6 @@ async function attemptLogin() {
             checkLoginSession();
             closeModal('loginModal');
             showToast("Welcome Treasurer");
-            
-            // Auto-enable admin mode on login
             if(!isAdminMode) toggleAdminMode();
         } else {
             showToast("Wrong password");
@@ -245,11 +249,8 @@ async function attemptLogin() {
 function handleLogout() {
     localStorage.removeItem('sc_admin');
     checkLoginSession();
-    if(isAdminMode) toggleAdminMode(); // Turn off edit buttons
-    
-    // Clear the password field so they have to re-type it to edit next time
+    if(isAdminMode) toggleAdminMode();
     document.getElementById('adminPass').value = ""; 
-    
     showToast("Logged out");
 }
 
@@ -266,11 +267,7 @@ function checkLoginSession() {
     }
 }
 
-// --- UTILS ---
-
 async function calculateBalance() {
-    // Fetch SUM of all transactions for accurate balance
-    // Note: In a huge app, you'd use a database function (RPC) for this.
     const { data } = await client.from('transactions').select('amount, type');
     let total = 0;
     if(data) {
@@ -280,16 +277,6 @@ async function calculateBalance() {
         });
     }
     document.getElementById('displayBalance').innerText = total.toLocaleString('en-PH', { minimumFractionDigits: 2 });
-}
-
-function setupRealtime() {
-    // This listens for ANY change in the DB and refreshes the list automatically
-    client.channel('custom-all-channel')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, (payload) => {
-        console.log('Change received!', payload);
-        fetchTransactions();
-    })
-    .subscribe();
 }
 
 function switchTab(id) {
@@ -304,15 +291,8 @@ function switchTab(id) {
     
     document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
     
-    // Simple logic to highlight the correct nav button
-    if(id === 'home') {
-        const btn = document.querySelector('button[onclick="switchTab(\'home\')"]');
-        if(btn) btn.classList.add('active');
-    }
-    if(id === 'be-heard') {
-        const btn = document.querySelector('button[onclick="switchTab(\'be-heard\')"]');
-        if(btn) btn.classList.add('active');
-    }
+    if(id === 'home') document.querySelector('button[onclick="switchTab(\'home\')"]')?.classList.add('active');
+    if(id === 'be-heard') document.querySelector('button[onclick="switchTab(\'be-heard\')"]')?.classList.add('active');
 }
 
 function openLogin() { document.getElementById('loginModal').style.display = 'flex'; }

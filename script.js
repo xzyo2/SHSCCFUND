@@ -3,16 +3,15 @@ const SUPABASE_URL = 'https://tokedafadxogunwwetef.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRva2VkYWZhZHhvZ3Vud3dldGVmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0Mzc4NTUsImV4cCI6MjA4MTAxMzg1NX0.HBS6hfKXt2g3oplwYoCg2t7qjqFyDMJvEmtlvgJSb3c';
 const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// --- STATE VARIABLES ---
+// --- STATE ---
 let transactions = [];
 let currentPage = 0;
 let isAdminMode = false;
 let selectedType = 'income';
-
-// Animation Memory
 let displayedBalance = 0;
+// NEW: Filter State
+let currentFilter = 'all'; 
 
-// --- INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', () => {
     fetchTransactions();
     setupRealtime(); 
@@ -22,7 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if(dateInput) dateInput.valueAsDate = new Date();
 });
 
-// --- DATA FETCHING ---
+// --- DATA FETCHING (Now with Filters!) ---
 async function fetchTransactions(isLoadMore = false) {
     if (!isLoadMore) { 
         currentPage = 0; 
@@ -32,12 +31,30 @@ async function fetchTransactions(isLoadMore = false) {
     const from = currentPage * 10;
     const to = from + 9;
 
-    const { data, error, count } = await client
+    // Start building the query
+    let query = client
         .from('transactions')
         .select('*', { count: 'exact' })
         .order('date', { ascending: false })
-        .order('id', { ascending: false })
-        .range(from, to);
+        .order('id', { ascending: false });
+
+    // APPLY FILTER LOGIC
+    if (currentFilter === 'month') {
+        const date = new Date();
+        const firstDay = new Date(date.getFullYear(), date.getMonth(), 1).toISOString();
+        query = query.gte('date', firstDay);
+    } 
+    else if (currentFilter === 'week') {
+        const date = new Date();
+        // Calculate start of the week (Sunday)
+        const day = date.getDay();
+        const diff = date.getDate() - day;
+        const firstDay = new Date(date.setDate(diff)).toISOString();
+        query = query.gte('date', firstDay);
+    }
+
+    // Apply range for pagination
+    const { data, error, count } = await query.range(from, to);
 
     if (error) {
         console.error("Supabase Error:", error);
@@ -46,6 +63,8 @@ async function fetchTransactions(isLoadMore = false) {
 
     transactions = isLoadMore ? [...transactions, ...data] : data;
     data.forEach(t => renderCard(t));
+    
+    // Always calculate TOTAL balance regardless of filter
     calculateBalance();
     
     if(document.getElementById('transCount')) {
@@ -58,6 +77,24 @@ async function fetchTransactions(isLoadMore = false) {
     }
 }
 
+// --- FILTER UI FUNCTIONS ---
+function toggleFilterMenu() {
+    const menu = document.getElementById('filterMenu');
+    menu.classList.toggle('hidden');
+}
+
+function applyFilter(type) {
+    currentFilter = type;
+    
+    // Update visual "Active" state of chips
+    document.querySelectorAll('.filter-chip').forEach(btn => btn.classList.remove('active'));
+    document.getElementById(`filter-${type}`).classList.add('active');
+    
+    // Refresh the list with the new filter
+    fetchTransactions(false);
+}
+
+// --- STANDARD FUNCTIONS ---
 function renderCard(t) {
     const list = document.getElementById('transList');
     const isIncome = t.type === 'income';
@@ -81,8 +118,6 @@ function renderCard(t) {
     list.appendChild(card);
 }
 
-// --- SECURE DB ACTIONS ---
-
 async function submitTransaction() {
     const id = document.getElementById('editId').value;
     const date = document.getElementById('tDate').value;
@@ -100,7 +135,6 @@ async function submitTransaction() {
         type: selectedType, 
         amount 
     };
-
     const action = id ? 'update' : 'create';
 
     try {
@@ -109,9 +143,7 @@ async function submitTransaction() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ action, payload, password })
         });
-
         const result = await res.json();
-
         if (result.success) {
             showToast("Success! Waiting for update...");
             closeModal('transModal');
@@ -119,7 +151,6 @@ async function submitTransaction() {
             showToast("Error: " + (result.message || result.error));
         }
     } catch (e) {
-        console.error(e);
         showToast("Server Connection Failed");
     }
 }
@@ -127,8 +158,7 @@ async function submitTransaction() {
 async function deleteTransaction() {
     const id = document.getElementById('editId').value;
     const password = document.getElementById('adminPass').value;
-
-    if(!confirm("Are you sure you want to delete this?")) return;
+    if(!confirm("Are you sure?")) return;
     if (!password) return showToast("Please login again");
 
     try {
@@ -137,36 +167,26 @@ async function deleteTransaction() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ action: 'delete', payload: { id }, password })
         });
-
         const result = await res.json();
         if (result.success) {
             showToast("Deleted. Waiting for update...");
             closeModal('transModal');
         } else {
-            showToast("Error deleting: " + result.message);
+            showToast("Error deleting");
         }
-    } catch (e) {
-        showToast("Server Connection Failed");
-    }
+    } catch (e) { showToast("Server Error"); }
 }
 
-// --- REALTIME LISTENER ---
 function setupRealtime() {
     const channel = client.channel('public:transactions')
-    .on(
-        'postgres_changes', 
-        { event: '*', schema: 'public', table: 'transactions' }, 
-        (payload) => {
-            console.log('Database changed!', payload);
-            fetchTransactions(); 
-        }
-    )
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, () => {
+        fetchTransactions(); 
+    })
     .subscribe();
 }
 
-// --- ANIMATION ENGINE ---
-
 async function calculateBalance() {
+    // Balance always calculates based on TOTAL history, ignoring filters
     const { data } = await client.from('transactions').select('amount, type');
     let total = 0;
     if(data) {
@@ -175,7 +195,6 @@ async function calculateBalance() {
             else total -= parseFloat(t.amount);
         });
     }
-    // Trigger Animation
     animateValue(displayedBalance, total, 2000); 
     displayedBalance = total;
 }
@@ -184,32 +203,22 @@ function animateValue(start, end, duration) {
     if (start === end) return;
     const element = document.getElementById("displayBalance");
     let startTime = null;
-
     function step(timestamp) {
         if (!startTime) startTime = timestamp;
         const progress = Math.min((timestamp - startTime) / duration, 1);
         const easeOut = 1 - Math.pow(1 - progress, 3);
         const current = start + (end - start) * easeOut;
-        
         element.innerHTML = current.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-        if (progress < 1) {
-            window.requestAnimationFrame(step);
-        } else {
-            element.innerHTML = end.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        }
+        if (progress < 1) window.requestAnimationFrame(step);
+        else element.innerHTML = end.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
     window.requestAnimationFrame(step);
 }
-
-// --- ADMIN & UI LOGIC ---
 
 function toggleAdminMode() {
     isAdminMode = !isAdminMode;
     const btn = document.getElementById('adminToggleBtn');
     const list = document.getElementById('transList');
-    
-    // NEW: We now toggle the whole controls div
     const controls = document.getElementById('adminControls');
     
     if (isAdminMode) {
@@ -225,44 +234,24 @@ function toggleAdminMode() {
     }
 }
 
-// --- BACKUP SYSTEM (NEW!) ---
 async function downloadBackup() {
-    if(!confirm("Download a full backup of all transactions?")) return;
-    showToast("Preparing backup...");
-
+    if(!confirm("Download backup?")) return;
     const { data, error } = await client.from('transactions').select('*').order('id', { ascending: true });
+    if (error) return showToast("Backup failed.");
 
-    if (error) {
-        console.error(error);
-        return showToast("Backup failed.");
-    }
-
-    // CSV Header
     let csvContent = "ID,Date,Description,Type,Amount,Created At\n";
-    
-    // CSV Rows
     data.forEach(row => {
         const cleanDesc = row.description ? row.description.replace(/"/g, '""') : ""; 
         csvContent += `${row.id},${row.date},"${cleanDesc}",${row.type},${row.amount},${row.created_at}\n`;
     });
 
-    // Create Download
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    
-    link.setAttribute("href", url);
-    link.setAttribute("download", `SHS_Treasury_Backup_${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = 'hidden';
-    
-    document.body.appendChild(link);
+    link.href = URL.createObjectURL(blob);
+    link.download = `SHS_Treasury_Backup_${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
-    document.body.removeChild(link);
-
     showToast("Backup Downloaded! 📂");
 }
-
-// --- UTILS ---
 
 function openTransactionModal() {
     document.getElementById('modalTitle').innerText = "New Transaction";
@@ -277,7 +266,6 @@ function openTransactionModal() {
 function openEditModal(id) {
     const t = transactions.find(x => x.id === id);
     if(!t) return;
-
     document.getElementById('modalTitle').innerText = `Edit Transaction #${id}`;
     document.getElementById('editId').value = id;
     document.getElementById('tDate').value = t.date;
@@ -285,7 +273,6 @@ function openEditModal(id) {
     document.getElementById('tAmount').value = t.amount;
     document.getElementById('deleteBtn').classList.remove('hidden');
     setTransType(t.type);
-    
     document.getElementById('transModal').style.display = 'flex';
 }
 
@@ -298,7 +285,6 @@ function setTransType(type) {
 async function attemptLogin() {
     const u = document.getElementById('adminUser').value;
     const p = document.getElementById('adminPass').value;
-    
     try {
         const res = await fetch('/api/auth', {
             method: 'POST',
@@ -306,7 +292,6 @@ async function attemptLogin() {
             body: JSON.stringify({ user: u, pass: p })
         });
         const data = await res.json();
-        
         if(data.success) {
             localStorage.setItem('sc_admin', 'true');
             checkLoginSession();
@@ -342,14 +327,7 @@ function checkLoginSession() {
 
 function switchTab(id) {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
-    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-    
-    const target = document.getElementById(id);
-    if(target) {
-        target.classList.remove('hidden');
-        target.classList.add('active');
-    }
-    
+    document.getElementById(id).classList.remove('hidden');
     document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
     if(id === 'home') document.querySelector('button[onclick="switchTab(\'home\')"]')?.classList.add('active');
     if(id === 'be-heard') document.querySelector('button[onclick="switchTab(\'be-heard\')"]')?.classList.add('active');
@@ -358,12 +336,7 @@ function switchTab(id) {
 function openLogin() { document.getElementById('loginModal').style.display = 'flex'; }
 function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 function loadMore() { currentPage++; fetchTransactions(true); }
-
 function showToast(msg) {
     const t = document.getElementById('toast');
-    if(t) {
-        t.innerText = msg;
-        t.classList.add('show');
-        setTimeout(() => t.classList.remove('show'), 3000);
-    }
+    if(t) { t.innerText = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 3000); }
 }

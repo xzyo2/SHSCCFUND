@@ -9,9 +9,8 @@ let currentPage = 0;
 let isAdminMode = false;
 let selectedType = 'income';
 
-// NEW: Animation Memory
-let currentBalance = 0;      // The actual money we have
-let displayedBalance = 0;    // The number currently shown on screen
+// Animation Memory
+let displayedBalance = 0;
 
 // --- INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', () => {
@@ -47,7 +46,7 @@ async function fetchTransactions(isLoadMore = false) {
 
     transactions = isLoadMore ? [...transactions, ...data] : data;
     data.forEach(t => renderCard(t));
-    calculateBalance(); // This will now trigger the animation
+    calculateBalance();
     
     if(document.getElementById('transCount')) {
         document.getElementById('transCount').innerText = `${count} records`;
@@ -83,6 +82,7 @@ function renderCard(t) {
 }
 
 // --- SECURE DB ACTIONS ---
+
 async function submitTransaction() {
     const id = document.getElementById('editId').value;
     const date = document.getElementById('tDate').value;
@@ -164,7 +164,7 @@ function setupRealtime() {
     .subscribe();
 }
 
-// --- ANIMATION ENGINE (The New Part!) ---
+// --- ANIMATION ENGINE ---
 
 async function calculateBalance() {
     const { data } = await client.from('transactions').select('amount, type');
@@ -175,11 +175,8 @@ async function calculateBalance() {
             else total -= parseFloat(t.amount);
         });
     }
-
-    // Trigger the animation from "Old Balance" to "New Total"
+    // Trigger Animation
     animateValue(displayedBalance, total, 2000); 
-    
-    // Update our memory for next time
     displayedBalance = total;
 }
 
@@ -191,44 +188,81 @@ function animateValue(start, end, duration) {
     function step(timestamp) {
         if (!startTime) startTime = timestamp;
         const progress = Math.min((timestamp - startTime) / duration, 1);
-        
-        // This math makes it slow down at the end (Ease Out Cubic)
         const easeOut = 1 - Math.pow(1 - progress, 3);
-        
         const current = start + (end - start) * easeOut;
+        
         element.innerHTML = current.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
         if (progress < 1) {
             window.requestAnimationFrame(step);
         } else {
-            // Ensure it lands exactly on the final number
             element.innerHTML = end.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
     }
-    
     window.requestAnimationFrame(step);
 }
 
-
 // --- ADMIN & UI LOGIC ---
+
 function toggleAdminMode() {
     isAdminMode = !isAdminMode;
     const btn = document.getElementById('adminToggleBtn');
     const list = document.getElementById('transList');
-    const addBtn = document.getElementById('addTransBtn');
+    
+    // NEW: We now toggle the whole controls div
+    const controls = document.getElementById('adminControls');
     
     if (isAdminMode) {
         btn.innerText = "Admin Mode: ON";
         btn.style.color = "#22c55e";
         list.classList.add('admin-mode');
-        addBtn.classList.remove('hidden');
+        if(controls) controls.classList.remove('hidden');
     } else {
         btn.innerText = "Admin Mode: OFF";
         btn.style.color = "#eab308";
         list.classList.remove('admin-mode');
-        addBtn.classList.add('hidden');
+        if(controls) controls.classList.add('hidden');
     }
 }
+
+// --- BACKUP SYSTEM (NEW!) ---
+async function downloadBackup() {
+    if(!confirm("Download a full backup of all transactions?")) return;
+    showToast("Preparing backup...");
+
+    const { data, error } = await client.from('transactions').select('*').order('id', { ascending: true });
+
+    if (error) {
+        console.error(error);
+        return showToast("Backup failed.");
+    }
+
+    // CSV Header
+    let csvContent = "ID,Date,Description,Type,Amount,Created At\n";
+    
+    // CSV Rows
+    data.forEach(row => {
+        const cleanDesc = row.description ? row.description.replace(/"/g, '""') : ""; 
+        csvContent += `${row.id},${row.date},"${cleanDesc}",${row.type},${row.amount},${row.created_at}\n`;
+    });
+
+    // Create Download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    
+    link.setAttribute("href", url);
+    link.setAttribute("download", `SHS_Treasury_Backup_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    showToast("Backup Downloaded! 📂");
+}
+
+// --- UTILS ---
 
 function openTransactionModal() {
     document.getElementById('modalTitle').innerText = "New Transaction";

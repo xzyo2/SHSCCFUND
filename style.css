@@ -156,3 +156,79 @@ input:focus { border-color: var(--primary); }
 .toast { visibility: hidden; position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 12px 24px; border-radius: 50px; font-size: 0.9rem; z-index: 300; white-space: nowrap; }
 .toast.show { visibility: visible; }
 @media (min-width: 600px) { .modal { align-items: center; } .modal-box { border-radius: 20px; } }
+
+/* --- MOBILE OPTIMIZATIONS --- */
+@media (max-width: 600px) {
+    /* 1. Cleaner, Slimmer Header */
+    header {
+        padding: 12px 15px;
+        background: rgba(18, 18, 18, 0.95); /* Slightly less transparent */
+    }
+    
+    .logo { font-size: 1rem; }
+
+    /* 2. Move Navigation to Bottom (App Style) */
+    nav {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        background: var(--bg);
+        border-top: 1px solid var(--border);
+        display: flex;
+        justify-content: space-around; /* Spread tabs evenly */
+        align-items: center;
+        padding: 10px 0;
+        z-index: 1000;
+        box-shadow: 0 -5px 20px rgba(0,0,0,0.2);
+        padding-bottom: env(safe-area-inset-bottom); /* Fix for iPhones */
+    }
+
+    /* 3. Style the Bottom Tabs */
+    .nav-btn {
+        margin: 0;
+        border: none;
+        font-size: 0.95rem;
+        opacity: 0.6;
+        padding: 8px;
+        flex: 1; /* Make them touchable areas */
+        text-align: center;
+        border-bottom: none !important; /* Remove desktop underline */
+    }
+
+    /* Active Tab (Highlighted) */
+    .nav-btn.active {
+        color: var(--text);
+        opacity: 1;
+        font-weight: 800;
+        transform: scale(1.05);
+    }
+
+    /* 4. Float the "Admin Mode" pill above the bottom bar */
+    #adminToggleBtn {
+        position: fixed;
+        bottom: 70px; /* Float above the nav bar */
+        right: 20px;
+        background: var(--card);
+        color: #eab308;
+        border: 1px solid var(--border);
+        border-radius: 50px;
+        padding: 8px 16px;
+        font-size: 0.8rem;
+        z-index: 1001;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+        width: auto; /* Prevent stretching */
+        flex: none;
+    }
+    
+    /* 5. Ensure content isn't hidden behind the bar */
+    body {
+        padding-bottom: 80px;
+    }
+    
+    /* 6. Adjust Modal for Mobile */
+    .modal-box {
+        border-radius: 20px 20px 0 0; /* Rounded top only */
+        padding-bottom: 50px; /* Space for bottom bar */
+    }
+}

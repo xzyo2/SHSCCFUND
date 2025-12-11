@@ -3,46 +3,65 @@ const SUPABASE_URL = 'https://tokedafadxogunwwetef.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRva2VkYWZhZHhvZ3Vud3dldGVmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0Mzc4NTUsImV4cCI6MjA4MTAxMzg1NX0.HBS6hfKXt2g3oplwYoCg2t7qjqFyDMJvEmtlvgJSb3c';
 const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-
+// --- STATE VARIABLES ---
 let transactions = [];
 let currentPage = 0;
 let isAdminMode = false;
 let selectedType = 'income'; // For the modal form
 
+// --- INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', () => {
     fetchTransactions();
     setupRealtime();
     checkLoginSession();
     
-    // Set default date to today
-    document.getElementById('tDate').valueAsDate = new Date();
+    // Set default date to today for new entries
+    const dateInput = document.getElementById('tDate');
+    if(dateInput) dateInput.valueAsDate = new Date();
 });
 
-// --- DATA FETCHING ---
+// --- DATA FETCHING (READ ONLY) ---
 async function fetchTransactions(isLoadMore = false) {
-    if (!isLoadMore) { currentPage = 0; document.getElementById('transList').innerHTML = ""; }
+    if (!isLoadMore) { 
+        currentPage = 0; 
+        document.getElementById('transList').innerHTML = ""; 
+    }
 
     const from = currentPage * 10;
     const to = from + 9;
 
-    // Fetch with ID included
+    // Fetch data from Supabase (Public Read Access)
     const { data, error, count } = await client
         .from('transactions')
         .select('*', { count: 'exact' })
         .order('date', { ascending: false })
-        .order('id', { ascending: false }) // Secondary sort by ID
+        .order('id', { ascending: false }) // Secondary sort by ID so newest is top
         .range(from, to);
 
-    if (error) return showToast("Error loading data");
+    if (error) {
+        console.error("Supabase Error:", error);
+        return showToast("Error loading data");
+    }
 
+    // Append new data or replace existing
     transactions = isLoadMore ? [...transactions, ...data] : data;
     
+    // Render the cards
     data.forEach(t => renderCard(t));
+    
+    // Update the Balance Board
     calculateBalance();
     
-    // UI Updates
-    document.getElementById('transCount').innerText = `${count} records`;
-    document.getElementById('loadMoreBtn').style.display = (to >= count - 1) ? 'none' : 'block';
+    // Update UI counters
+    if(document.getElementById('transCount')) {
+        document.getElementById('transCount').innerText = `${count} records`;
+    }
+    
+    // Handle "Load More" button visibility
+    const loadBtn = document.getElementById('loadMoreBtn');
+    if(loadBtn) {
+        loadBtn.style.display = (to >= count - 1) ? 'none' : 'block';
+    }
 }
 
 function renderCard(t) {
@@ -68,7 +87,81 @@ function renderCard(t) {
     list.appendChild(card);
 }
 
-// --- ADMIN LOGIC ---
+// --- SECURE DB ACTIONS (WRITE via SERVER) ---
+
+async function submitTransaction() {
+    const id = document.getElementById('editId').value;
+    const date = document.getElementById('tDate').value;
+    const desc = document.getElementById('tDesc').value;
+    const amount = document.getElementById('tAmount').value;
+    // We need the password currently in the login box to authorize the write
+    const password = document.getElementById('adminPass').value; 
+
+    if (!desc || !amount) return showToast("Please fill all fields");
+    if (!password) return showToast("Please login again to save (Security Check)");
+
+    const payload = { 
+        id: id ? id : undefined, // Only send ID if editing
+        date, 
+        description: desc, 
+        type: selectedType, 
+        amount 
+    };
+
+    const action = id ? 'update' : 'create';
+
+    try {
+        // Send data to Vercel Server (Hidden API) instead of direct Supabase
+        const res = await fetch('/api/transaction', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action, payload, password })
+        });
+
+        const result = await res.json();
+
+        if (result.success) {
+            showToast("Success!");
+            closeModal('transModal');
+            // The Realtime listener will auto-refresh the list
+        } else {
+            showToast("Error: " + (result.message || result.error));
+        }
+    } catch (e) {
+        console.error(e);
+        showToast("Server Connection Failed");
+    }
+}
+
+async function deleteTransaction() {
+    const id = document.getElementById('editId').value;
+    const password = document.getElementById('adminPass').value;
+
+    if(!confirm("Are you sure you want to delete this?")) return;
+    if (!password) return showToast("Please login again (Security Check)");
+
+    try {
+        const res = await fetch('/api/transaction', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'delete', payload: { id }, password })
+        });
+
+        const result = await res.json();
+        if (result.success) {
+            showToast("Deleted.");
+            closeModal('transModal');
+            // Realtime listener will handle refresh
+        } else {
+            showToast("Error deleting: " + result.message);
+        }
+    } catch (e) {
+        showToast("Server Connection Failed");
+    }
+}
+
+// --- ADMIN & UI LOGIC ---
+
 function toggleAdminMode() {
     isAdminMode = !isAdminMode;
     const btn = document.getElementById('adminToggleBtn');
@@ -88,11 +181,10 @@ function toggleAdminMode() {
     }
 }
 
-// --- MODALS (ADD & EDIT) ---
 function openTransactionModal() {
     // Reset form for "Add" mode
     document.getElementById('modalTitle').innerText = "New Transaction";
-    document.getElementById('editId').value = ""; // Empty ID means New
+    document.getElementById('editId').value = "";
     document.getElementById('tDesc').value = "";
     document.getElementById('tAmount').value = "";
     document.getElementById('deleteBtn').classList.add('hidden');
@@ -101,7 +193,7 @@ function openTransactionModal() {
 }
 
 function openEditModal(id) {
-    // Find data
+    // Find data locally first to fill the form
     const t = transactions.find(x => x.id === id);
     if(!t) return;
 
@@ -111,7 +203,7 @@ function openEditModal(id) {
     document.getElementById('tDate').value = t.date;
     document.getElementById('tDesc').value = t.description;
     document.getElementById('tAmount').value = t.amount;
-    document.getElementById('deleteBtn').classList.remove('hidden'); // Show Delete
+    document.getElementById('deleteBtn').classList.remove('hidden');
     setTransType(t.type);
     
     document.getElementById('transModal').style.display = 'flex';
@@ -123,105 +215,27 @@ function setTransType(type) {
     document.getElementById('btnExpense').className = `type-btn ${type === 'expense' ? 'active' : ''}`;
 }
 
-// --- DB ACTIONS ---
-async function submitTransaction() {
-    const id = document.getElementById('editId').value;
-    const date = document.getElementById('tDate').value;
-    const desc = document.getElementById('tDesc').value;
-    const amount = document.getElementById('tAmount').value;
-
-    if (!desc || !amount) return showToast("Please fill all fields");
-
-    const payload = { date, description: desc, type: selectedType, amount };
-
-    let error;
-    if (id) {
-        // UPDATE existing
-        const res = await client.from('transactions').update(payload).eq('id', id);
-        error = res.error;
-    } else {
-        // INSERT new
-        const res = await client.from('transactions').insert(payload);
-        error = res.error;
-    }
-
-    if (error) {
-        showToast("Error saving: " + error.message);
-    } else {
-        showToast("Success!");
-        closeModal('transModal');
-        fetchTransactions(); // Refresh list
-    }
-}
-
-async function deleteTransaction() {
-    const id = document.getElementById('editId').value;
-    if(!confirm("Are you sure you want to delete this?")) return;
-
-    const { error } = await client.from('transactions').delete().eq('id', id);
-    if (error) showToast("Error deleting");
-    else {
-        showToast("Deleted.");
-        closeModal('transModal');
-        fetchTransactions();
-    }
-}
-
-// --- UTILS ---
-function openLogin() { document.getElementById('loginModal').style.display = 'flex'; }
-function closeModal(id) { document.getElementById(id).style.display = 'none'; }
-function loadMore() { currentPage++; fetchTransactions(true); }
-
-async function calculateBalance() {
-    // We fetch ALL simply for accurate balance (optimized for small app)
-    const { data } = await client.from('transactions').select('amount, type');
-    let total = 0;
-    if(data) {
-        data.forEach(t => {
-            if(t.type === 'income') total += parseFloat(t.amount);
-            else total -= parseFloat(t.amount);
-        });
-    }
-    document.getElementById('displayBalance').innerText = total.toLocaleString('en-PH', { minimumFractionDigits: 2 });
-}
-
-function showToast(msg) {
-    const t = document.getElementById('toast');
-    t.innerText = msg;
-    t.classList.add('show');
-    setTimeout(() => t.classList.remove('show'), 3000);
-}
-
-// --- AUTH & TABS ---
-function switchTab(id) {
-    document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
-    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-    document.getElementById(id).classList.remove('hidden');
-    document.getElementById(id).classList.add('active');
-    
-    document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
-    // Highlight correct nav button (simple logic)
-    if(id === 'home') document.querySelector('button[onclick="switchTab(\'home\')"]').classList.add('active');
-    if(id === 'be-heard') document.querySelector('button[onclick="switchTab(\'be-heard\')"]').classList.add('active');
-}
-
-// Secure Login (Vercel API)
 async function attemptLogin() {
     const u = document.getElementById('adminUser').value;
     const p = document.getElementById('adminPass').value;
     
     try {
+        // Authenticate via Vercel Server
         const res = await fetch('/api/auth', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ user: u, pass: p })
         });
         const data = await res.json();
+        
         if(data.success) {
             localStorage.setItem('sc_admin', 'true');
             checkLoginSession();
             closeModal('loginModal');
             showToast("Welcome Treasurer");
+            
+            // Auto-enable admin mode on login
+            if(!isAdminMode) toggleAdminMode();
         } else {
             showToast("Wrong password");
         }
@@ -231,8 +245,11 @@ async function attemptLogin() {
 function handleLogout() {
     localStorage.removeItem('sc_admin');
     checkLoginSession();
-    // Turn off admin mode if on
-    if(isAdminMode) toggleAdminMode();
+    if(isAdminMode) toggleAdminMode(); // Turn off edit buttons
+    
+    // Clear the password field so they have to re-type it to edit next time
+    document.getElementById('adminPass').value = ""; 
+    
     showToast("Logged out");
 }
 
@@ -249,12 +266,64 @@ function checkLoginSession() {
     }
 }
 
-// --- REALTIME LISTENER ---
+// --- UTILS ---
+
+async function calculateBalance() {
+    // Fetch SUM of all transactions for accurate balance
+    // Note: In a huge app, you'd use a database function (RPC) for this.
+    const { data } = await client.from('transactions').select('amount, type');
+    let total = 0;
+    if(data) {
+        data.forEach(t => {
+            if(t.type === 'income') total += parseFloat(t.amount);
+            else total -= parseFloat(t.amount);
+        });
+    }
+    document.getElementById('displayBalance').innerText = total.toLocaleString('en-PH', { minimumFractionDigits: 2 });
+}
+
 function setupRealtime() {
+    // This listens for ANY change in the DB and refreshes the list automatically
     client.channel('custom-all-channel')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, (payload) => {
-        // When a new transaction happens, refresh the data automatically
+        console.log('Change received!', payload);
         fetchTransactions();
     })
     .subscribe();
+}
+
+function switchTab(id) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    
+    const target = document.getElementById(id);
+    if(target) {
+        target.classList.remove('hidden');
+        target.classList.add('active');
+    }
+    
+    document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+    
+    // Simple logic to highlight the correct nav button
+    if(id === 'home') {
+        const btn = document.querySelector('button[onclick="switchTab(\'home\')"]');
+        if(btn) btn.classList.add('active');
+    }
+    if(id === 'be-heard') {
+        const btn = document.querySelector('button[onclick="switchTab(\'be-heard\')"]');
+        if(btn) btn.classList.add('active');
+    }
+}
+
+function openLogin() { document.getElementById('loginModal').style.display = 'flex'; }
+function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+function loadMore() { currentPage++; fetchTransactions(true); }
+
+function showToast(msg) {
+    const t = document.getElementById('toast');
+    if(t) {
+        t.innerText = msg;
+        t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 3000);
+    }
 }

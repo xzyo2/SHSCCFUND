@@ -2,6 +2,7 @@
 const SUPABASE_URL = 'https://tokedafadxogunwwetef.supabase.co'; 
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRva2VkYWZhZHhvZ3Vud3dldGVmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0Mzc4NTUsImV4cCI6MjA4MTAxMzg1NX0.HBS6hfKXt2g3oplwYoCg2t7qjqFyDMJvEmtlvgJSb3c';
 
+// Initialize Supabase
 const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // --- STATE ---
@@ -90,8 +91,15 @@ async function fetchTransactions(isLoadMore = false) {
     
     const loadBtn = document.getElementById('loadMoreBtn');
     if(loadBtn) {
+        // Hide button if we reached the total count
         loadBtn.style.display = (to >= count - 1) ? 'none' : 'block';
     }
+}
+
+// Wrapper for the "Load More" button click
+function loadMore() {
+    currentPage++;
+    fetchTransactions(true);
 }
 
 // --- RENDER CARD ---
@@ -443,12 +451,38 @@ function checkLoginSession() {
     }
 }
 
+// --- TABS & HELPER FUNCTIONS ---
+
 function switchTab(id) {
+    // Hide all tab content
     document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
-    document.getElementById(id).classList.remove('hidden');
+    
+    // Show the selected tab
+    const selectedTab = document.getElementById(id);
+    if(selectedTab) selectedTab.classList.remove('hidden');
     
     // Remove active class from BOTH desktop and mobile buttons
     document.querySelectorAll('.nav-btn, .desktop-nav-btn').forEach(el => el.classList.remove('active'));
     
-    // Highlight the clicked tab 
-    if(id === 'home') document.querySelectorAll('button[onclick="switchTab(\'home\')
+    // Highlight the clicked tab (Dynamic selector)
+    const activeButtons = document.querySelectorAll(`button[onclick="switchTab('${id}')"]`);
+    activeButtons.forEach(btn => btn.classList.add('active'));
+}
+
+// --- MISSING HELPERS ADDED BELOW ---
+
+function openLogin() {
+    const modal = document.getElementById('loginModal');
+    if(modal) modal.style.display = 'flex';
+}
+
+function closeModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if(modal) modal.style.display = 'none';
+}
+
+function showToast(message) {
+    // Basic Alert as fallback, or custom logic if you have a toast div
+    // If you have a specific toast element, replace this alert
+    alert(message); 
+}

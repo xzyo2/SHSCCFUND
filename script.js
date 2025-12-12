@@ -91,12 +91,10 @@ async function fetchTransactions(isLoadMore = false) {
     
     const loadBtn = document.getElementById('loadMoreBtn');
     if(loadBtn) {
-        // Hide button if we reached the total count
         loadBtn.style.display = (to >= count - 1) ? 'none' : 'block';
     }
 }
 
-// Wrapper for the "Load More" button click
 function loadMore() {
     currentPage++;
     fetchTransactions(true);
@@ -254,12 +252,17 @@ if (receiptInput) {
     });
 }
 
-// --- DELETE TRANSACTION ---
+// --- DELETE TRANSACTION (UPDATED WITH IMAGE DELETION) ---
 async function deleteTransaction() {
     const id = document.getElementById('editId').value;
     const password = document.getElementById('adminPass').value;
-    if(!confirm("Are you sure?")) return;
+    
+    if(!confirm("Are you sure you want to delete this transaction?")) return;
     if (!password) return showToast("Please login again");
+
+    // 1. Grab transaction details BEFORE deletion to get the image URL
+    const transaction = transactions.find(t => t.id === parseInt(id));
+    const receiptUrl = transaction ? transaction.receipt_url : null;
 
     try {
         const res = await fetch('/api/transaction', {
@@ -267,14 +270,35 @@ async function deleteTransaction() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ action: 'delete', payload: { id }, password })
         });
+        
         const result = await res.json();
+        
         if (result.success) {
-            showToast("Deleted. Waiting for update...");
+            // 2. If successfully deleted from DB, now delete image from Storage
+            if (receiptUrl) {
+                // Extracts "filename.jpg" from ".../receipts/filename.jpg"
+                const filePath = receiptUrl.split('/receipts/')[1]; 
+                
+                if (filePath) {
+                    const { error: storageError } = await client
+                        .storage
+                        .from('receipts')
+                        .remove([filePath]);
+                    
+                    if(storageError) console.error("Error deleting image:", storageError);
+                    else console.log("Image deleted successfully");
+                }
+            }
+
+            showToast("Deleted successfully.");
             closeModal('transModal');
         } else {
-            showToast("Error deleting");
+            showToast("Error deleting: " + (result.message || "Unknown error"));
         }
-    } catch (e) { showToast("Server Error"); }
+    } catch (e) { 
+        console.error(e);
+        showToast("Server Error"); 
+    }
 }
 
 // --- REALTIME ---
@@ -454,17 +478,13 @@ function checkLoginSession() {
 // --- TABS & HELPER FUNCTIONS ---
 
 function switchTab(id) {
-    // Hide all tab content
     document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
     
-    // Show the selected tab
     const selectedTab = document.getElementById(id);
     if(selectedTab) selectedTab.classList.remove('hidden');
     
-    // Remove active class from BOTH desktop and mobile buttons
     document.querySelectorAll('.nav-btn, .desktop-nav-btn').forEach(el => el.classList.remove('active'));
     
-    // Highlight the clicked tab (Dynamic selector)
     const activeButtons = document.querySelectorAll(`button[onclick="switchTab('${id}')"]`);
     activeButtons.forEach(btn => btn.classList.add('active'));
 }
@@ -481,12 +501,10 @@ function closeModal(modalId) {
 
 // --- CUSTOM TOAST NOTIFICATION ---
 function showToast(message) {
-    // 1. Create container if not exists
     let container = document.getElementById('toast-container');
     if (!container) {
         container = document.createElement('div');
         container.id = 'toast-container';
-        // Base styles to ensure it floats above everything
         container.style.position = 'fixed';
         container.style.bottom = '20px';
         container.style.left = '50%';
@@ -495,15 +513,13 @@ function showToast(message) {
         container.style.display = 'flex';
         container.style.flexDirection = 'column';
         container.style.gap = '10px';
-        container.style.pointerEvents = 'none'; // Click through container
+        container.style.pointerEvents = 'none';
         document.body.appendChild(container);
     }
 
-    // 2. Create the toast element
     const toast = document.createElement('div');
     toast.innerText = message;
     
-    // 3. Styling (Inline to guarantee it works without extra CSS)
     toast.style.background = 'rgba(30, 30, 30, 0.9)';
     toast.style.color = '#fff';
     toast.style.padding = '12px 24px';
@@ -518,13 +534,11 @@ function showToast(message) {
 
     container.appendChild(toast);
 
-    // 4. Animate In
     requestAnimationFrame(() => {
         toast.style.opacity = '1';
         toast.style.transform = 'translateY(0)';
     });
 
-    // 5. Remove after 3 seconds
     setTimeout(() => {
         toast.style.opacity = '0';
         toast.style.transform = 'translateY(10px)';

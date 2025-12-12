@@ -45,9 +45,17 @@ body {
 header {
     position: sticky; top: 0; z-index: 100; background: var(--bg);
     border-bottom: 1px solid var(--border); padding: 15px 20px;
+    display: flex; align-items: center; justify-content: space-between; /* Changed for better spacing */
+}
+.logo { font-weight: 800; font-size: 1.1rem; }
+
+.header-right {
     display: flex; align-items: center; gap: 15px;
 }
-.logo { font-weight: 800; font-size: 1.1rem; margin-right: auto; }
+
+.header-actions {
+    display: flex; align-items: center; gap: 5px;
+}
 
 header button {
     background: none; border: none; cursor: pointer; padding: 8px; border-radius: 50%;
@@ -73,8 +81,6 @@ header button:active { transform: scale(0.95); }
     transition: all 0.5s cubic-bezier(0.68, -0.55, 0.27, 1.55);
 }
 body.light-mode .theme-icon { background: #555; transform: rotate(180deg); }
-
-.desktop-nav .header-actions { display: flex; align-items: center; gap: 5px; }
 
 /* Layout */
 .container { max-width: 600px; margin: 0 auto; padding: 20px; }
@@ -117,47 +123,21 @@ body.light-mode .theme-icon { background: #555; transform: rotate(180deg); }
 
 /* Edit Icon */
 .edit-icon {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    border: 1px solid var(--border);
-    background: var(--input-bg);
-    color: var(--text);
-    cursor: pointer;
-    display: none; 
-    align-items: center;
-    justify-content: center;
-    font-size: 1rem;
-    margin-left: 10px;
-    transition: all 0.2s ease;
-    padding: 0;
+    width: 32px; height: 32px; border-radius: 50%;
+    border: 1px solid var(--border); background: var(--input-bg);
+    color: var(--text); cursor: pointer; display: none; 
+    align-items: center; justify-content: center;
+    font-size: 1rem; margin-left: 10px; transition: all 0.2s ease; padding: 0;
 }
-.edit-icon:hover {
-    background: var(--primary);
-    color: white;
-    border-color: var(--primary);
-    transform: scale(1.1);
-}
-.admin-mode .edit-icon {
-    display: flex; 
-}
-
+.edit-icon:hover { background: var(--primary); color: white; border-color: var(--primary); transform: scale(1.1); }
+.admin-mode .edit-icon { display: flex; }
 
 /* Receipt Styles */
 .receipt-badge { 
-    display: inline-block; 
-    background: var(--primary); 
-    color: white; 
-    font-size: 0.7rem; 
-    padding: 3px 8px; 
-    border-radius: 6px; 
-    text-decoration: none; 
-    font-weight: bold; 
-    margin-left: 8px; 
-    vertical-align: middle; 
-    transition: opacity 0.2s; 
-    border: none; /* Changed from default link style */
-    cursor: pointer;
+    display: inline-block; background: var(--primary); color: white; 
+    font-size: 0.7rem; padding: 3px 8px; border-radius: 6px; 
+    text-decoration: none; font-weight: bold; margin-left: 8px; 
+    vertical-align: middle; transition: opacity 0.2s; border: none; cursor: pointer;
 }
 .receipt-badge:hover { opacity: 0.8; }
 .no-receipt-text { display: block; font-size: 0.65rem; color: var(--red); opacity: 0.8; margin-top: 3px; font-style: italic; }
@@ -171,26 +151,19 @@ body.light-mode .theme-icon { background: #555; transform: rotate(180deg); }
 }
 .file-upload-box:hover { border-color: var(--primary); }
 
-/* FIX FOR FILE REMOVAL: Explicitly stack the input below the content */
 input[type="file"] { 
     position: absolute; width: 100%; height: 100%; top: 0; left: 0; 
-    opacity: 0; cursor: pointer; 
-    z-index: 5; /* Lower than the remove button */
+    opacity: 0; cursor: pointer; z-index: 5;
 }
-
 .file-content { 
     display: flex; align-items: center; gap: 10px; 
-    pointer-events: none; /* Text shouldn't block clicks */
-    position: relative; 
-    z-index: 10; /* Places this layer ABOVE the input */
+    pointer-events: none; position: relative; z-index: 10; 
 }
-
 #fileName { color: var(--text-sub); font-size: 0.9rem; }
 
 /* Remove File Button */
 .remove-file-btn {
-    pointer-events: auto; /* Re-enable clicks for the button */
-    z-index: 20; /* Ensure it's the top-most element */
+    pointer-events: auto; z-index: 20;
     background: rgba(239, 68, 68, 0.15); color: var(--red); border-radius: 50%;
     width: 24px; height: 24px; padding: 4px; border: none; cursor: pointer;
     display: flex; align-items: center; justify-content: center;
@@ -201,8 +174,8 @@ input[type="file"] {
 /* Mobile Nav */
 .mobile-nav { display: none; }
 .mobile-float-btn { display: none; }
+
 @media (max-width: 600px) {
-    .desktop-nav { display: none; }
     header { padding: 12px 15px; }
     .mobile-nav {
         display: flex; position: fixed; bottom: 0; left: 0; width: 100%;
@@ -212,7 +185,16 @@ input[type="file"] {
     }
     .nav-btn { flex: 1; text-align: center; opacity: 0.6; border-bottom: none !important; margin: 0; font-size: 0.9rem; padding: 8px; background: transparent; color: var(--text); border: none; }
     .nav-btn.active { opacity: 1; font-weight: 700; transform: scale(1.05); color: var(--primary); }
-    .mobile-float-btn { display: block !important; position: fixed; bottom: 80px; right: 20px; background: var(--card); color: #eab308; border: 1px solid var(--border); border-radius: 50px; padding: 8px 16px; z-index: 1001; box-shadow: 0 4px 15px rgba(0,0,0,0.4); font-weight: 600;}
+    
+    /* FIX: Remove !important so .hidden class still works */
+    .mobile-float-btn { 
+        display: block; 
+        position: fixed; bottom: 80px; right: 20px; 
+        background: var(--card); color: #eab308; 
+        border: 1px solid var(--border); border-radius: 50px; 
+        padding: 8px 16px; z-index: 1001; 
+        box-shadow: 0 4px 15px rgba(0,0,0,0.4); font-weight: 600;
+    }
 }
 
 /* Modals */
@@ -220,38 +202,15 @@ input[type="file"] {
 .modal-box { background: var(--card); width: 100%; max-width: 500px; padding: 25px; border-radius: 24px 24px 0 0; animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1); padding-bottom: 40px; border: 1px solid var(--border); }
 @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
 
-/* IMAGE VIEWER MODAL STYLES */
-.image-viewer-modal {
-    align-items: center; /* Center vertically */
-    justify-content: center;
-}
-.image-container {
-    position: relative;
-    max-width: 90%;
-    max-height: 85vh;
-    display: flex;
-    justify-content: center;
-}
-#fullReceiptImg {
-    max-width: 100%;
-    max-height: 85vh;
-    object-fit: contain;
-    border-radius: 8px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-}
+/* Image Viewer */
+.image-viewer-modal { align-items: center; justify-content: center; }
+.image-container { position: relative; max-width: 90%; max-height: 85vh; display: flex; justify-content: center; }
+#fullReceiptImg { max-width: 100%; max-height: 85vh; object-fit: contain; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
 .close-icon-floating {
-    position: absolute;
-    top: -40px;
-    right: 0;
-    color: white;
-    font-size: 2rem;
-    cursor: pointer;
-    background: rgba(0,0,0,0.5);
-    width: 35px; height: 35px;
-    display: flex; align-items: center; justify-content: center;
-    border-radius: 50%;
+    position: absolute; top: -40px; right: 0; color: white;
+    font-size: 2rem; cursor: pointer; background: rgba(0,0,0,0.5);
+    width: 35px; height: 35px; display: flex; align-items: center; justify-content: center; border-radius: 50%;
 }
-
 
 .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
 .modal-header h2 { margin: 0; font-size: 1.5rem; }
@@ -297,4 +256,4 @@ input:not([type="file"]):focus { border-color: var(--primary); box-shadow: 0 0 0
 .toast.show { visibility: visible; opacity: 1; transform: translateX(-50%) translateY(0); }
 .load-more { display: block; width: 100%; padding: 15px; margin-top: 20px; background: transparent; border: 1px dashed var(--border); color: var(--text-sub); border-radius: 12px; cursor: pointer; font-weight: 600; transition: all 0.2s; }
 .load-more:hover { background: rgba(125,125,125,0.1); color: var(--text); border-color: var(--text); }
-@media (min-width: 600px) { .modal { align-items: center; } .modal-box { border-radius: 24px; } .mobile-nav { display: none; } .desktop-nav { display: block; } }
+@media (min-width: 600px) { .modal { align-items: center; } .modal-box { border-radius: 24px; } .mobile-nav { display: none; } }

@@ -6,12 +6,12 @@
     <title>Student Council Funds</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap" rel="stylesheet">
 </head>
 <body class="dark-mode">
 
     <header>
-        <div class="logo">SC Treasury</div>
+        <div class="logo">SC Funds</div>
         
         <button id="themeBtn" onclick="toggleTheme()" title="Switch Theme">
             <div class="theme-icon"></div>
@@ -91,36 +91,53 @@
     </div>
 
     <div id="transModal" class="modal">
-        <div class="modal-box">
-            <span class="close-btn" onclick="closeModal('transModal')">&times;</span>
-            <h2 id="modalTitle">New Transaction</h2>
-            <input type="hidden" id="editId">
-            
-            <label>Date</label>
-            <input type="date" id="tDate">
-            
-            <label>Description</label>
-            <input type="text" id="tDesc" placeholder="Description">
-            
-            <label>Type</label>
-            <div class="toggle-group">
-                <button id="btnIncome" class="type-btn active" onclick="setTransType('income')">Income</button>
-                <button id="btnExpense" class="type-btn" onclick="setTransType('expense')">Expense</button>
+        <div class="modal-box extended-modal">
+            <div class="modal-header">
+                <h2 id="modalTitle">New Transaction</h2>
+                <span class="close-icon" onclick="closeModal('transModal')">&times;</span>
             </div>
             
-            <label>Amount (PHP)</label>
-            <input type="number" id="tAmount" placeholder="0.00">
+            <input type="hidden" id="editId">
+            
+            <div class="input-group">
+                <label>Date</label>
+                <input type="date" id="tDate">
+            </div>
+            
+            <div class="input-group">
+                <label>Description</label>
+                <input type="text" id="tDesc" placeholder="What was this for?">
+            </div>
+            
+            <div class="input-group">
+                <label>Type</label>
+                <div class="toggle-group">
+                    <button id="btnIncome" class="type-btn active" onclick="setTransType('income')">Income</button>
+                    <button id="btnExpense" class="type-btn" onclick="setTransType('expense')">Expense</button>
+                </div>
+            </div>
+            
+            <div class="input-group">
+                <label>Amount (PHP)</label>
+                <input type="number" id="tAmount" placeholder="0.00">
+            </div>
 
-            <label>Receipt Proof (Optional)</label>
-            <div class="file-upload-box">
-                <input type="file" id="tReceipt" accept="image/*">
-                <div style="display: flex; align-items: center; justify-content: center; gap: 10px;">
-                    <span id="fileName">Tap to upload image...</span>
-                    <button id="clearFileBtn" class="hidden" onclick="clearFileSelection(event)" style="background:none; border:none; cursor:pointer; font-size: 1.2rem;">❌</button>
+            <div class="input-group">
+                <label>Receipt Proof (Optional)</label>
+                <div class="file-upload-box">
+                    <input type="file" id="tReceipt" accept="image/*">
+                    <div class="file-content">
+                        <span id="fileName">Tap to upload image...</span>
+                        <button id="clearFileBtn" class="hidden remove-file-btn" onclick="clearFileSelection(event)">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            <button class="primary-btn" onclick="submitTransaction()">Save Transaction</button>
+            <button id="saveTxBtn" class="primary-btn" onclick="submitTransaction()">Save Transaction</button>
             <button id="deleteBtn" class="delete-btn hidden" onclick="deleteTransaction()">Delete Record</button>
         </div>
     </div>

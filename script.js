@@ -134,52 +134,60 @@ function renderCard(t) {
 
 // --- SUBMIT TRANSACTION ---
 async function submitTransaction() {
+    // 1. Get Elements
+    const btn = document.getElementById('saveTxBtn');
     const id = document.getElementById('editId').value;
     const date = document.getElementById('tDate').value;
     const desc = document.getElementById('tDesc').value;
     const amount = document.getElementById('tAmount').value;
     const password = document.getElementById('adminPass').value; 
-    
     const fileInput = document.getElementById('tReceipt');
     const file = fileInput ? fileInput.files[0] : null;
 
+    // 2. Validation
     if (!desc || !amount) return showToast("Please fill all fields");
     if (!password) return showToast("Please login again to save");
 
-    showToast("Processing...");
-
-    let finalReceiptUrl = null;
-
-    if (file) {
-        const cleanName = file.name.replace(/[^a-zA-Z0-9.]/g, '_');
-        const fileName = `${Date.now()}_${cleanName}`;
-        
-        const { error: uploadError } = await client.storage.from('receipts').upload(fileName, file);
-        
-        if (uploadError) {
-            console.error("Upload Error:", uploadError);
-            return showToast("Image upload failed. Check permissions.");
-        }
-        
-        const { data: urlData } = client.storage.from('receipts').getPublicUrl(fileName);
-        finalReceiptUrl = urlData.publicUrl;
-    }
-
-    const payload = { 
-        id: id ? id : undefined, 
-        date, 
-        description: desc, 
-        type: selectedType, 
-        amount
-    };
-
-    if (finalReceiptUrl) {
-        payload.receipt_url = finalReceiptUrl;
-    }
-
-    const action = id ? 'update' : 'create';
+    // 3. Prevent Double Click (Spam)
+    btn.disabled = true;
+    btn.innerText = "Processing...";
 
     try {
+        let finalReceiptUrl = null;
+
+        // 4. Upload Image
+        if (file) {
+            const cleanName = file.name.replace(/[^a-zA-Z0-9.]/g, '_');
+            const fileName = `${Date.now()}_${cleanName}`;
+            
+            const { error: uploadError } = await client.storage.from('receipts').upload(fileName, file);
+            
+            if (uploadError) {
+                console.error("Upload Error:", uploadError);
+                showToast("Image upload failed.");
+                throw new Error("Upload failed"); // Stop execution
+            }
+            
+            const { data: urlData } = client.storage.from('receipts').getPublicUrl(fileName);
+            finalReceiptUrl = urlData.publicUrl;
+        }
+
+        // 5. Construct Payload
+        const payload = { 
+            id: id ? id : undefined, 
+            date, 
+            description: desc, 
+            type: selectedType, 
+            amount
+        };
+
+        if (finalReceiptUrl) {
+            payload.receipt_url = finalReceiptUrl;
+        }
+
+        const action = id ? 'update' : 'create';
+
+        // 6. Send to API
         const res = await fetch('/api/transaction', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -195,15 +203,24 @@ async function submitTransaction() {
         } else {
             showToast("Error: " + (result.message || result.error));
         }
+
     } catch (e) {
         console.error(e);
         showToast("Server Connection Failed");
+    } finally {
+        // 7. Reset Button State (Always runs)
+        btn.disabled = false;
+        btn.innerText = "Save Transaction";
     }
 }
 
 // --- CLEAR FILE HELPER ---
 function clearFileSelection(e) {
-    if(e) e.preventDefault(); 
+    // CRITICAL FIX: Stop the click from bubbling up to the input
+    if(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
     
     const fileInput = document.getElementById('tReceipt');
     const fileNameDisplay = document.getElementById('fileName');
@@ -225,7 +242,8 @@ if (receiptInput) {
             fileNameDisplay.innerText = this.files[0].name;
             clearBtn.classList.remove('hidden'); 
         } else {
-            clearFileSelection(null);
+            // User hit cancel in dialog
+            // clearFileSelection(null); // Optional: decide if you want to clear on cancel
         }
     });
 }
@@ -355,9 +373,10 @@ function openEditModal(id) {
     document.getElementById('tDesc').value = t.description;
     document.getElementById('tAmount').value = t.amount;
     
+    // UI logic: If existing receipt, show "Replace...", otherwise "Upload"
     if(document.getElementById('fileName')) {
-        document.getElementById('fileName').innerText = t.receipt_url ? "Replace existing image..." : "Upload image...";
-        document.getElementById('clearFileBtn').classList.add('hidden');
+        document.getElementById('fileName').innerText = t.receipt_url ? "Replace existing image..." : "Tap to upload image...";
+        document.getElementById('clearFileBtn').classList.add('hidden'); // Hide delete button initially on edit
     }
 
     document.getElementById('deleteBtn').classList.remove('hidden');

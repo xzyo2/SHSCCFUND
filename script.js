@@ -102,7 +102,8 @@ function renderCard(t) {
 
     let receiptBadge = '';
     if (t.receipt_url) {
-        receiptBadge = `<a href="${t.receipt_url}" target="_blank" class="receipt-badge">VIEW RECEIPT</a>`;
+        // CHANGED: Use onclick to open modal instead of href target=_blank
+        receiptBadge = `<button onclick="viewReceipt('${t.receipt_url}')" class="receipt-badge">VIEW RECEIPT</button>`;
     }
 
     let warningText = '';
@@ -130,6 +131,15 @@ function renderCard(t) {
         </div>
     `;
     list.appendChild(card);
+}
+
+// --- NEW: VIEW RECEIPT IN MODAL ---
+function viewReceipt(url) {
+    const modal = document.getElementById('imageModal');
+    const img = document.getElementById('fullReceiptImg');
+    
+    img.src = url;
+    modal.style.display = 'flex';
 }
 
 // --- SUBMIT TRANSACTION ---
@@ -214,12 +224,12 @@ async function submitTransaction() {
     }
 }
 
-// --- CLEAR FILE HELPER ---
+// --- CLEAR FILE HELPER (UPDATED) ---
 function clearFileSelection(e) {
-    // CRITICAL FIX: Stop the click from bubbling up to the input
+    // Fix: Stop the click from bubbling up to the input
     if(e) {
         e.preventDefault();
-        e.stopPropagation();
+        e.stopImmediatePropagation(); // Stronger stop
     }
     
     const fileInput = document.getElementById('tReceipt');
@@ -243,7 +253,6 @@ if (receiptInput) {
             clearBtn.classList.remove('hidden'); 
         } else {
             // User hit cancel in dialog
-            // clearFileSelection(null); // Optional: decide if you want to clear on cancel
         }
     });
 }

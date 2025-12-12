@@ -1,464 +1,311 @@
-// --- CONFIGURATION ---
-const SUPABASE_URL = 'https://tokedafadxogunwwetef.supabase.co'; 
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRva2VkYWZhZHhvZ3Vud3dldGVmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0Mzc4NTUsImV4cCI6MjA4MTAxMzg1NX0.HBS6hfKXt2g3oplwYoCg2t7qjqFyDMJvEmtlvgJSb3c';
+/* --- GLOBAL RESET & BOX SIZING --- */
+* { box-sizing: border-box; }
 
-const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+:root {
+    /* Dark Mode (Default) */
+    --bg: #121212;
+    --card: #1E1E1E;
+    --text: #ffffff;
+    --text-sub: #aaaaaa;
+    --primary: #3b82f6; 
+    --green: #22c55e;
+    --red: #ef4444;
+    --border: #333;
+    --filter-bg: #222;
+    --input-bg: #2A2A2A; 
+    --input-border: #444;
+}
 
-// --- STATE ---
-let transactions = [];
-let currentPage = 0;
-let isAdminMode = false;
-let selectedType = 'income';
-let displayedBalance = 0;
-let currentFilter = 'all'; 
+/* Light Mode Variables */
+body.light-mode {
+    --bg: #f9fafb;
+    --card: #ffffff;
+    --text: #111827;
+    --text-sub: #6b7280;
+    --border: #e5e7eb;
+    --filter-bg: #f3f4f6;
+    --input-bg: #f9fafb;
+    --input-border: #d1d5db;
+}
 
-// --- INITIALIZATION ---
-document.addEventListener('DOMContentLoaded', () => {
-    fetchTransactions();
-    setupRealtime(); 
-    checkLoginSession();
-    updateSortIcon();
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: var(--bg);
+    color: var(--text);
+    margin: 0;
+    padding-bottom: 80px;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.3s ease, color 0.3s ease;
+}
+
+/* Icons */
+.icon-img { width: 24px; height: 24px; object-fit: contain; vertical-align: middle; }
+
+/* Header */
+header {
+    position: sticky; top: 0; z-index: 100; background: var(--bg);
+    border-bottom: 1px solid var(--border); padding: 15px 20px;
+    display: flex; align-items: center; justify-content: space-between; 
+}
+.logo { font-weight: 800; font-size: 1.1rem; }
+
+/* Desktop Navigation Styles */
+.desktop-nav-middle {
+    display: flex;
+    gap: 10px;
+}
+
+.desktop-nav-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-sub);
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 8px 16px;
+    transition: all 0.2s;
+    border-radius: 20px;
+}
+
+.desktop-nav-btn:hover {
+    color: var(--text);
+    background: rgba(125,125,125,0.1);
+}
+
+.desktop-nav-btn.active {
+    color: var(--primary);
+    background: rgba(59, 130, 246, 0.1);
+    font-weight: 700;
+}
+
+.header-right {
+    display: flex; align-items: center; gap: 15px;
+}
+
+.header-actions {
+    display: flex; align-items: center; gap: 5px;
+}
+
+header button {
+    background: none; border: none; cursor: pointer; padding: 8px; border-radius: 50%;
+    transition: transform 0.2s ease, background 0.2s ease; display: flex; align-items: center; justify-content: center;
+}
+header button:hover { background: rgba(125, 125, 125, 0.15); transform: scale(1.1); }
+header button:active { transform: scale(0.95); }
+
+/* LOGOUT BUTTON */
+#logoutBtn {
+    color: var(--text); 
+    font-weight: 600;
+    font-size: 0.9rem;
+    border-radius: 8px;
+    padding: 8px 12px;
+}
+#logoutBtn:hover { background: rgba(255, 0, 0, 0.1); color: var(--red); }
+
+/* Theme Icon */
+.theme-icon {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: linear-gradient(45deg, #f39c12, #f1c40f); border: 2px solid var(--bg);
+    transition: all 0.5s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+}
+body.light-mode .theme-icon { background: #555; transform: rotate(180deg); }
+
+/* Layout */
+.container { max-width: 600px; margin: 0 auto; padding: 20px; }
+
+/* Balance Card */
+.balance-card {
+    background: linear-gradient(135deg, #2c3e50, #000000); padding: 30px;
+    border-radius: 24px; text-align: center; margin-bottom: 30px;
+    box-shadow: 0 20px 40px -10px rgba(0,0,0,0.4); color: white; border: 1px solid #333;
+    transition: transform 0.2s;
+}
+.balance-card:hover { transform: translateY(-2px); }
+.balance-card .label { color: rgba(255,255,255,0.6); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }
+.balance-card .amount { font-size: 3.2rem; font-weight: 800; margin: 10px 0; letter-spacing: -1px; }
+
+/* Filter */
+.list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+.filter-btn { background: transparent; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; padding: 6px; transition: all 0.2s; }
+.filter-btn:hover { background: var(--card); transform: scale(1.05); }
+
+.filter-menu { display: flex; gap: 8px; margin-bottom: 20px; overflow-x: auto; padding-bottom: 5px; scrollbar-width: none; }
+.filter-chip { background: var(--filter-bg); border: 1px solid var(--border); color: var(--text-sub); padding: 8px 16px; border-radius: 50px; font-size: 0.85rem; cursor: pointer; white-space: nowrap; transition: all 0.2s; font-weight: 500; }
+.filter-chip.active { background: var(--text); color: var(--bg); border-color: var(--text); font-weight: 700; transform: scale(1.02); }
+
+/* Cards */
+.trans-card {
+    background: var(--card); padding: 16px; border-radius: 16px; margin-bottom: 12px;
+    display: flex; justify-content: space-between; align-items: center;
+    border: 1px solid var(--border); transition: transform 0.2s, background-color 0.2s;
+}
+.trans-card:active { transform: scale(0.98); }
+.t-left { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.t-id { font-size: 0.7rem; color: var(--text-sub); font-family: monospace; opacity: 0.7; }
+.t-desc { font-weight: 600; font-size: 1.05rem; }
+.t-date { font-size: 0.8rem; color: var(--text-sub); }
+.t-right { text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+.t-amount { font-weight: 700; font-size: 1rem; }
+.income { color: var(--green); }
+.expense { color: var(--red); }
+
+/* Edit Icon */
+.edit-icon {
+    width: 32px; height: 32px; border-radius: 50%;
+    border: 1px solid var(--border); background: var(--input-bg);
+    color: var(--text); cursor: pointer; display: none; 
+    align-items: center; justify-content: center;
+    font-size: 1rem; margin-left: 10px; transition: all 0.2s ease; padding: 0;
+}
+.edit-icon:hover { background: var(--primary); color: white; border-color: var(--primary); transform: scale(1.1); }
+.admin-mode .edit-icon { display: flex; }
+
+/* Receipt Styles */
+.receipt-badge { 
+    display: inline-block; background: var(--primary); color: white; 
+    font-size: 0.7rem; padding: 3px 8px; border-radius: 6px; 
+    text-decoration: none; font-weight: bold; margin-left: 8px; 
+    vertical-align: middle; transition: opacity 0.2s; border: none; cursor: pointer;
+}
+.receipt-badge:hover { opacity: 0.8; }
+.no-receipt-text { display: block; font-size: 0.65rem; color: var(--red); opacity: 0.8; margin-top: 3px; font-style: italic; }
+
+/* File Upload Box */
+.file-upload-box {
+    background: var(--input-bg); border: 2px dashed var(--input-border); border-radius: 12px;
+    padding: 0; margin-bottom: 10px; position: relative;
+    height: 50px; display: flex; align-items: center; justify-content: center;
+    transition: border-color 0.2s;
+}
+.file-upload-box:hover { border-color: var(--primary); }
+
+input[type="file"] { 
+    position: absolute; width: 100%; height: 100%; top: 0; left: 0; 
+    opacity: 0; cursor: pointer; z-index: 5;
+}
+.file-content { 
+    display: flex; align-items: center; gap: 10px; 
+    pointer-events: none; position: relative; z-index: 10; 
+}
+#fileName { color: var(--text-sub); font-size: 0.9rem; }
+
+/* Remove File Button */
+.remove-file-btn {
+    pointer-events: auto; z-index: 20;
+    background: rgba(239, 68, 68, 0.15); color: var(--red); border-radius: 50%;
+    width: 24px; height: 24px; padding: 4px; border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.2s;
+}
+.remove-file-btn:hover { background: rgba(239, 68, 68, 0.3); transform: scale(1.1); }
+
+/* Mobile Nav */
+.mobile-nav { display: none; }
+.mobile-float-btn { display: none; }
+
+@media (max-width: 600px) {
+    header { padding: 12px 15px; }
     
-    const dateInput = document.getElementById('tDate');
-    if(dateInput) dateInput.valueAsDate = new Date();
-});
+    /* HIDE Desktop Nav on Mobile */
+    .desktop-nav-middle { display: none; }
 
-// --- THEME ---
-function toggleTheme() {
-    const body = document.body;
-    if (body.classList.contains('dark-mode')) {
-        body.classList.remove('dark-mode');
-        body.classList.add('light-mode');
-    } else {
-        body.classList.remove('light-mode');
-        body.classList.add('dark-mode');
+    .mobile-nav {
+        display: flex; position: fixed; bottom: 0; left: 0; width: 100%;
+        background: var(--bg); border-top: 1px solid var(--border);
+        justify-content: space-around; padding: 10px 0; z-index: 1000;
+        padding-bottom: env(safe-area-inset-bottom); box-shadow: 0 -5px 20px rgba(0,0,0,0.2);
     }
-    updateSortIcon();
-}
-
-function updateSortIcon() {
-    const icon = document.getElementById('sortIcon');
-    const isDark = document.body.classList.contains('dark-mode');
-    if (icon) {
-        icon.src = isDark ? "img/sortdm.png" : "img/sortwm.png";
-    }
-}
-
-// --- DATA FETCHING ---
-async function fetchTransactions(isLoadMore = false) {
-    if (!isLoadMore) { 
-        currentPage = 0; 
-        document.getElementById('transList').innerHTML = ""; 
-    }
-
-    const from = currentPage * 10;
-    const to = from + 9;
-
-    let query = client
-        .from('transactions')
-        .select('*', { count: 'exact' })
-        .order('date', { ascending: false })
-        .order('id', { ascending: false });
-
-    if (currentFilter === 'month') {
-        const date = new Date();
-        const firstDay = new Date(date.getFullYear(), date.getMonth(), 1).toISOString();
-        query = query.gte('date', firstDay);
-    } 
-    else if (currentFilter === 'week') {
-        const date = new Date();
-        const day = date.getDay();
-        const diff = date.getDate() - day;
-        const firstDay = new Date(date.setDate(diff)).toISOString();
-        query = query.gte('date', firstDay);
-    }
-
-    const { data, error, count } = await query.range(from, to);
-
-    if (error) {
-        console.error("Supabase Error:", error);
-        return showToast("Error loading data");
-    }
-
-    transactions = isLoadMore ? [...transactions, ...data] : data;
-    data.forEach(t => renderCard(t));
-    calculateBalance();
+    .nav-btn { flex: 1; text-align: center; opacity: 0.6; border-bottom: none !important; margin: 0; font-size: 0.9rem; padding: 8px; background: transparent; color: var(--text); border: none; }
+    .nav-btn.active { opacity: 1; font-weight: 700; transform: scale(1.05); color: var(--primary); }
     
-    if(document.getElementById('transCount')) {
-        document.getElementById('transCount').innerText = `${count} records`;
-    }
-    
-    const loadBtn = document.getElementById('loadMoreBtn');
-    if(loadBtn) {
-        loadBtn.style.display = (to >= count - 1) ? 'none' : 'block';
-    }
-}
-
-// --- RENDER CARD ---
-function renderCard(t) {
-    const list = document.getElementById('transList');
-    const isIncome = t.type === 'income';
-    const amountFmt = parseFloat(t.amount).toLocaleString('en-PH', { minimumFractionDigits: 2 });
-
-    let receiptBadge = '';
-    if (t.receipt_url) {
-        receiptBadge = `<button onclick="viewReceipt('${t.receipt_url}')" class="receipt-badge">VIEW RECEIPT</button>`;
-    }
-
-    let warningText = '';
-    if (!t.receipt_url) {
-        warningText = `<small class="no-receipt-text">Note: No receipt image attached. (Transaction verified manually)</small>`;
-    }
-
-    const card = document.createElement('div');
-    card.className = 'trans-card';
-    card.innerHTML = `
-        <div class="t-left">
-            <span class="t-id">#${t.id}</span>
-            <div>
-                <span class="t-desc">${t.description}</span>
-                ${receiptBadge}
-            </div>
-            ${warningText}
-            <span class="t-date">${new Date(t.date).toLocaleDateString()}</span>
-        </div>
-        <div class="t-right">
-            <span class="t-amount ${isIncome ? 'income' : 'expense'}">
-                ${isIncome ? '+' : '-'} &#8369;${amountFmt}
-            </span>
-            <button class="edit-icon" onclick="openEditModal(${t.id})">✎</button>
-        </div>
-    `;
-    list.appendChild(card);
-}
-
-// --- VIEW RECEIPT IN MODAL ---
-function viewReceipt(url) {
-    const modal = document.getElementById('imageModal');
-    const img = document.getElementById('fullReceiptImg');
-    
-    img.src = url;
-    modal.style.display = 'flex';
-}
-
-// --- SUBMIT TRANSACTION ---
-async function submitTransaction() {
-    const btn = document.getElementById('saveTxBtn');
-    const id = document.getElementById('editId').value;
-    const date = document.getElementById('tDate').value;
-    const desc = document.getElementById('tDesc').value;
-    const amount = document.getElementById('tAmount').value;
-    const password = document.getElementById('adminPass').value; 
-    const fileInput = document.getElementById('tReceipt');
-    const file = fileInput ? fileInput.files[0] : null;
-
-    if (!desc || !amount) return showToast("Please fill all fields");
-    if (!password) return showToast("Please login again to save");
-
-    btn.disabled = true;
-    btn.innerText = "Processing...";
-
-    try {
-        let finalReceiptUrl = null;
-
-        if (file) {
-            const cleanName = file.name.replace(/[^a-zA-Z0-9.]/g, '_');
-            const fileName = `${Date.now()}_${cleanName}`;
-            
-            const { error: uploadError } = await client.storage.from('receipts').upload(fileName, file);
-            
-            if (uploadError) {
-                console.error("Upload Error:", uploadError);
-                showToast("Image upload failed.");
-                throw new Error("Upload failed"); 
-            }
-            
-            const { data: urlData } = client.storage.from('receipts').getPublicUrl(fileName);
-            finalReceiptUrl = urlData.publicUrl;
-        }
-
-        const payload = { 
-            id: id ? id : undefined, 
-            date, 
-            description: desc, 
-            type: selectedType, 
-            amount
-        };
-
-        if (finalReceiptUrl) {
-            payload.receipt_url = finalReceiptUrl;
-        }
-
-        const action = id ? 'update' : 'create';
-
-        const res = await fetch('/api/transaction', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action, payload, password })
-        });
-
-        const result = await res.json();
-
-        if (result.success) {
-            showToast("Success! Waiting for update...");
-            closeModal('transModal');
-            clearFileSelection(null); 
-        } else {
-            showToast("Error: " + (result.message || result.error));
-        }
-
-    } catch (e) {
-        console.error(e);
-        showToast("Server Connection Failed");
-    } finally {
-        btn.disabled = false;
-        btn.innerText = "Save Transaction";
+    .mobile-float-btn { 
+        display: block; 
+        position: fixed; bottom: 80px; right: 20px; 
+        background: var(--card); color: #eab308; 
+        border: 1px solid var(--border); border-radius: 50px; 
+        padding: 8px 16px; z-index: 1001; 
+        box-shadow: 0 4px 15px rgba(0,0,0,0.4); font-weight: 600;
     }
 }
 
-// --- CLEAR FILE HELPER ---
-function clearFileSelection(e) {
-    if(e) {
-        e.preventDefault();
-        e.stopImmediatePropagation();
-    }
-    
-    const fileInput = document.getElementById('tReceipt');
-    const fileNameDisplay = document.getElementById('fileName');
-    const clearBtn = document.getElementById('clearFileBtn');
-    
-    if(fileInput) fileInput.value = ""; 
-    if(fileNameDisplay) fileNameDisplay.innerText = "Tap to upload image...";
-    if(clearBtn) clearBtn.classList.add('hidden'); 
+/* Modals */
+.modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 200; justify-content: center; align-items: flex-end; backdrop-filter: blur(4px); }
+.modal-box { background: var(--card); width: 100%; max-width: 500px; padding: 25px; border-radius: 24px 24px 0 0; animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1); padding-bottom: 40px; border: 1px solid var(--border); }
+@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+/* Image Viewer */
+.image-viewer-modal { align-items: center; justify-content: center; }
+.image-container { position: relative; max-width: 90%; max-height: 85vh; display: flex; justify-content: center; }
+#fullReceiptImg { max-width: 100%; max-height: 85vh; object-fit: contain; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+.close-icon-floating {
+    position: absolute; top: -40px; right: 0; color: white;
+    font-size: 2rem; cursor: pointer; background: rgba(0,0,0,0.5);
+    width: 35px; height: 35px; display: flex; align-items: center; justify-content: center; border-radius: 50%;
 }
 
-// --- FILE LISTENER ---
-const receiptInput = document.getElementById('tReceipt');
-if (receiptInput) {
-    receiptInput.addEventListener('change', function(){
-        const fileNameDisplay = document.getElementById('fileName');
-        const clearBtn = document.getElementById('clearFileBtn');
+.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
+.modal-header h2 { margin: 0; font-size: 1.5rem; }
+.close-icon { font-size: 2rem; cursor: pointer; color: var(--text-sub); line-height: 0.5; }
+.close-icon:hover { color: var(--text); }
 
-        if(this.files && this.files[0]) {
-            fileNameDisplay.innerText = this.files[0].name;
-            clearBtn.classList.remove('hidden'); 
-        }
-    });
+.input-group { margin-bottom: 20px; }
+.input-group label { display: block; color: var(--text-sub); font-size: 0.85rem; margin-bottom: 8px; font-weight: 600; }
+
+input:not([type="file"]) {
+    width: 100%; padding: 14px; margin: 0;
+    background: var(--input-bg); border: 1px solid var(--input-border);
+    border-radius: 12px; color: var(--text); font-size: 1rem;
+    outline: none; transition: border-color 0.2s, box-shadow 0.2s;
+}
+input:not([type="file"]):focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); }
+
+.primary-btn {
+    width: 100%; padding: 16px; background: var(--primary); color: white;
+    border: none; border-radius: 14px; font-weight: 700; font-size: 1rem;
+    cursor: pointer; transition: background 0.2s, transform 0.1s, opacity 0.2s;
+    margin-top: 10px;
+}
+.primary-btn:active { transform: scale(0.98); }
+.primary-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.action-btn { padding: 10px 20px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 20px; cursor: pointer; transition: background 0.2s; font-weight: 500;}
+.action-btn:hover { background: rgba(255,255,255,0.2); }
+
+.delete-btn { background: var(--input-bg); margin-top: 15px; width: 100%; padding: 15px; color: var(--red); border: 1px solid var(--red); border-radius: 14px; font-weight: bold; cursor: pointer; transition: background 0.2s; }
+.delete-btn:hover { background: rgba(239, 68, 68, 0.1); }
+
+.toggle-group { display: flex; background: var(--input-bg); padding: 4px; border-radius: 12px; border: 1px solid var(--input-border); }
+.type-btn {
+    flex: 1; padding: 10px; background: transparent; border: none;
+    color: var(--text-sub); border-radius: 8px; font-weight: 600;
+    cursor: pointer; transition: all 0.2s;
+}
+.type-btn.active { background: var(--card); color: var(--text); box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+
+.hidden { display: none !important; }
+
+/* TOAST Z-INDEX FIX */
+.toast { 
+    visibility: hidden; 
+    position: fixed; 
+    bottom: 20px; 
+    left: 50%; 
+    transform: translateX(-50%) translateY(20px); 
+    background: #333; 
+    color: white; 
+    padding: 12px 24px; 
+    border-radius: 50px; 
+    font-size: 0.9rem; 
+    white-space: nowrap; 
+    opacity: 0; 
+    transition: all 0.3s; 
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    z-index: 10000; /* Ensure this is above everything */
 }
 
-// --- DELETE TRANSACTION ---
-async function deleteTransaction() {
-    const id = document.getElementById('editId').value;
-    const password = document.getElementById('adminPass').value;
-    if(!confirm("Are you sure?")) return;
-    if (!password) return showToast("Please login again");
+.toast.show { visibility: visible; opacity: 1; transform: translateX(-50%) translateY(0); }
 
-    try {
-        const res = await fetch('/api/transaction', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'delete', payload: { id }, password })
-        });
-        const result = await res.json();
-        if (result.success) {
-            showToast("Deleted. Waiting for update...");
-            closeModal('transModal');
-        } else {
-            showToast("Error deleting");
-        }
-    } catch (e) { showToast("Server Error"); }
-}
-
-// --- REALTIME ---
-function setupRealtime() {
-    client.channel('public:transactions')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, () => {
-        fetchTransactions(); 
-    })
-    .subscribe();
-}
-
-// --- BALANCE ---
-async function calculateBalance() {
-    const { data } = await client.from('transactions').select('amount, type');
-    let total = 0;
-    if(data) {
-        data.forEach(t => {
-            if(t.type === 'income') total += parseFloat(t.amount);
-            else total -= parseFloat(t.amount);
-        });
-    }
-    animateValue(displayedBalance, total, 2000); 
-    displayedBalance = total;
-}
-
-function animateValue(start, end, duration) {
-    if (start === end) return;
-    const element = document.getElementById("displayBalance");
-    if (!element) return;
-    let startTime = null;
-    function step(timestamp) {
-        if (!startTime) startTime = timestamp;
-        const progress = Math.min((timestamp - startTime) / duration, 1);
-        const easeOut = 1 - Math.pow(1 - progress, 3);
-        const current = start + (end - start) * easeOut;
-        element.innerHTML = current.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        if (progress < 1) window.requestAnimationFrame(step);
-        else element.innerHTML = end.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    }
-    window.requestAnimationFrame(step);
-}
-
-// --- UI UTILS ---
-function toggleAdminMode() {
-    isAdminMode = !isAdminMode;
-    const btn = document.getElementById('adminToggleBtn');
-    const list = document.getElementById('transList');
-    const controls = document.getElementById('adminControls');
-    
-    if (isAdminMode) {
-        btn.innerText = "Admin Mode: ON";
-        btn.style.color = "#22c55e";
-        list.classList.add('admin-mode');
-        if(controls) controls.classList.remove('hidden');
-    } else {
-        btn.innerText = "Admin Mode: OFF";
-        btn.style.color = "#eab308";
-        list.classList.remove('admin-mode');
-        if(controls) controls.classList.add('hidden');
-    }
-}
-
-async function downloadBackup() {
-    if(!confirm("Download backup?")) return;
-    const { data, error } = await client.from('transactions').select('*').order('id', { ascending: true });
-    if (error) return showToast("Backup failed.");
-
-    let csvContent = "ID,Date,Description,Type,Amount,ReceiptURL,Created At\n";
-    data.forEach(row => {
-        const cleanDesc = row.description ? row.description.replace(/"/g, '""') : ""; 
-        const rUrl = row.receipt_url || '';
-        csvContent += `${row.id},${row.date},"${cleanDesc}",${row.type},${row.amount},${rUrl},${row.created_at}\n`;
-    });
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `SHS_Treasury_Backup_${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
-    showToast("Backup Downloaded! 📂");
-}
-
-function openTransactionModal() {
-    document.getElementById('modalTitle').innerText = "New Transaction";
-    document.getElementById('editId').value = "";
-    document.getElementById('tDesc').value = "";
-    document.getElementById('tAmount').value = "";
-    
-    clearFileSelection(null); 
-
-    document.getElementById('deleteBtn').classList.add('hidden');
-    setTransType('income');
-    document.getElementById('transModal').style.display = 'flex';
-}
-
-function openEditModal(id) {
-    const t = transactions.find(x => x.id === id);
-    if(!t) return;
-    document.getElementById('modalTitle').innerText = `Edit Transaction #${id}`;
-    document.getElementById('editId').value = id;
-    document.getElementById('tDate').value = t.date;
-    document.getElementById('tDesc').value = t.description;
-    document.getElementById('tAmount').value = t.amount;
-    
-    // UI logic: If existing receipt, show "Replace...", otherwise "Upload"
-    if(document.getElementById('fileName')) {
-        document.getElementById('fileName').innerText = t.receipt_url ? "Replace existing image..." : "Tap to upload image...";
-        document.getElementById('clearFileBtn').classList.add('hidden'); 
-    }
-
-    document.getElementById('deleteBtn').classList.remove('hidden');
-    setTransType(t.type);
-    document.getElementById('transModal').style.display = 'flex';
-}
-
-function setTransType(type) {
-    selectedType = type;
-    document.getElementById('btnIncome').className = `type-btn ${type === 'income' ? 'active' : ''}`;
-    document.getElementById('btnExpense').className = `type-btn ${type === 'expense' ? 'active' : ''}`;
-}
-
-// --- AUTH ---
-function toggleFilterMenu() {
-    document.getElementById('filterMenu').classList.toggle('hidden');
-}
-
-function applyFilter(type) {
-    currentFilter = type;
-    document.querySelectorAll('.filter-chip').forEach(btn => btn.classList.remove('active'));
-    document.getElementById(`filter-${type}`).classList.add('active');
-    fetchTransactions(false);
-}
-
-async function attemptLogin() {
-    const u = document.getElementById('adminUser').value;
-    const p = document.getElementById('adminPass').value;
-    try {
-        const res = await fetch('/api/auth', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ user: u, pass: p })
-        });
-        const data = await res.json();
-        if(data.success) {
-            localStorage.setItem('sc_admin', 'true');
-            checkLoginSession();
-            closeModal('loginModal');
-            showToast("Welcome Treasurer");
-            if(!isAdminMode) toggleAdminMode();
-        } else {
-            showToast("Wrong password");
-        }
-    } catch(e) { showToast("Server Error"); }
-}
-
-function handleLogout() {
-    localStorage.removeItem('sc_admin');
-    checkLoginSession();
-    if(isAdminMode) toggleAdminMode();
-    document.getElementById('adminPass').value = ""; 
-    showToast("Logged out");
-}
-
-function checkLoginSession() {
-    const isLogged = localStorage.getItem('sc_admin') === 'true';
-    if(isLogged) {
-        document.getElementById('loginBtn').classList.add('hidden');
-        document.getElementById('logoutBtn').classList.remove('hidden');
-        document.getElementById('adminToggleBtn').classList.remove('hidden');
-    } else {
-        document.getElementById('loginBtn').classList.remove('hidden');
-        document.getElementById('logoutBtn').classList.add('hidden');
-        document.getElementById('adminToggleBtn').classList.add('hidden');
-    }
-}
-
-function switchTab(id) {
-    document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
-    document.getElementById(id).classList.remove('hidden');
-    
-    // NEW: Remove active class from BOTH desktop and mobile buttons
-    document.querySelectorAll('.nav-btn, .desktop-nav-btn').forEach(el => el.classList.remove('active'));
-    
-    // NEW: Highlight the clicked tab (works for both since we select by onclick attribute)
-    if(id === 'home') document.querySelectorAll('button[onclick="switchTab(\'home\')"]').forEach(b => b.classList.add('active'));
-    if(id === 'be-heard') document.querySelectorAll('button[onclick="switchTab(\'be-heard\')"]').forEach(b => b.classList.add('active'));
-}
-
-function openLogin() { document.getElementById('loginModal').style.display = 'flex'; }
-function closeModal(id) { document.getElementById(id).style.display = 'none'; }
-function loadMore() { currentPage++; fetchTransactions(true); }
-function showToast(msg) {
-    const t = document.getElementById('toast');
-    if(t) { t.innerText = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 3000); }
-}
+.load-more { display: block; width: 100%; padding: 15px; margin-top: 20px; background: transparent; border: 1px dashed var(--border); color: var(--text-sub); border-radius: 12px; cursor: pointer; font-weight: 600; transition: all 0.2s; }
+.load-more:hover { background: rgba(125,125,125,0.1); color: var(--text); border-color: var(--text); }
+@media (min-width: 600px) { .modal { align-items: center; } .modal-box { border-radius: 24px; } .mobile-nav { display: none; } }

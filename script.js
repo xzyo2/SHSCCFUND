@@ -102,7 +102,6 @@ function renderCard(t) {
 
     let receiptBadge = '';
     if (t.receipt_url) {
-        // CHANGED: Use onclick to open modal instead of href target=_blank
         receiptBadge = `<button onclick="viewReceipt('${t.receipt_url}')" class="receipt-badge">VIEW RECEIPT</button>`;
     }
 
@@ -133,7 +132,7 @@ function renderCard(t) {
     list.appendChild(card);
 }
 
-// --- NEW: VIEW RECEIPT IN MODAL ---
+// --- VIEW RECEIPT IN MODAL ---
 function viewReceipt(url) {
     const modal = document.getElementById('imageModal');
     const img = document.getElementById('fullReceiptImg');
@@ -144,7 +143,6 @@ function viewReceipt(url) {
 
 // --- SUBMIT TRANSACTION ---
 async function submitTransaction() {
-    // 1. Get Elements
     const btn = document.getElementById('saveTxBtn');
     const id = document.getElementById('editId').value;
     const date = document.getElementById('tDate').value;
@@ -154,18 +152,15 @@ async function submitTransaction() {
     const fileInput = document.getElementById('tReceipt');
     const file = fileInput ? fileInput.files[0] : null;
 
-    // 2. Validation
     if (!desc || !amount) return showToast("Please fill all fields");
     if (!password) return showToast("Please login again to save");
 
-    // 3. Prevent Double Click (Spam)
     btn.disabled = true;
     btn.innerText = "Processing...";
 
     try {
         let finalReceiptUrl = null;
 
-        // 4. Upload Image
         if (file) {
             const cleanName = file.name.replace(/[^a-zA-Z0-9.]/g, '_');
             const fileName = `${Date.now()}_${cleanName}`;
@@ -175,14 +170,13 @@ async function submitTransaction() {
             if (uploadError) {
                 console.error("Upload Error:", uploadError);
                 showToast("Image upload failed.");
-                throw new Error("Upload failed"); // Stop execution
+                throw new Error("Upload failed"); 
             }
             
             const { data: urlData } = client.storage.from('receipts').getPublicUrl(fileName);
             finalReceiptUrl = urlData.publicUrl;
         }
 
-        // 5. Construct Payload
         const payload = { 
             id: id ? id : undefined, 
             date, 
@@ -197,7 +191,6 @@ async function submitTransaction() {
 
         const action = id ? 'update' : 'create';
 
-        // 6. Send to API
         const res = await fetch('/api/transaction', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -218,18 +211,16 @@ async function submitTransaction() {
         console.error(e);
         showToast("Server Connection Failed");
     } finally {
-        // 7. Reset Button State (Always runs)
         btn.disabled = false;
         btn.innerText = "Save Transaction";
     }
 }
 
-// --- CLEAR FILE HELPER (UPDATED) ---
+// --- CLEAR FILE HELPER ---
 function clearFileSelection(e) {
-    // Fix: Stop the click from bubbling up to the input
     if(e) {
         e.preventDefault();
-        e.stopImmediatePropagation(); // Stronger stop
+        e.stopImmediatePropagation();
     }
     
     const fileInput = document.getElementById('tReceipt');
@@ -251,8 +242,6 @@ if (receiptInput) {
         if(this.files && this.files[0]) {
             fileNameDisplay.innerText = this.files[0].name;
             clearBtn.classList.remove('hidden'); 
-        } else {
-            // User hit cancel in dialog
         }
     });
 }
@@ -385,7 +374,7 @@ function openEditModal(id) {
     // UI logic: If existing receipt, show "Replace...", otherwise "Upload"
     if(document.getElementById('fileName')) {
         document.getElementById('fileName').innerText = t.receipt_url ? "Replace existing image..." : "Tap to upload image...";
-        document.getElementById('clearFileBtn').classList.add('hidden'); // Hide delete button initially on edit
+        document.getElementById('clearFileBtn').classList.add('hidden'); 
     }
 
     document.getElementById('deleteBtn').classList.remove('hidden');

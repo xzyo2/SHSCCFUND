@@ -447,18 +447,8 @@ function switchTab(id) {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
     document.getElementById(id).classList.remove('hidden');
     
-    // NEW: Remove active class from BOTH desktop and mobile buttons
+    // Remove active class from BOTH desktop and mobile buttons
     document.querySelectorAll('.nav-btn, .desktop-nav-btn').forEach(el => el.classList.remove('active'));
     
-    // NEW: Highlight the clicked tab (works for both since we select by onclick attribute)
-    if(id === 'home') document.querySelectorAll('button[onclick="switchTab(\'home\')"]').forEach(b => b.classList.add('active'));
-    if(id === 'be-heard') document.querySelectorAll('button[onclick="switchTab(\'be-heard\')"]').forEach(b => b.classList.add('active'));
-}
-
-function openLogin() { document.getElementById('loginModal').style.display = 'flex'; }
-function closeModal(id) { document.getElementById(id).style.display = 'none'; }
-function loadMore() { currentPage++; fetchTransactions(true); }
-function showToast(msg) {
-    const t = document.getElementById('toast');
-    if(t) { t.innerText = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 3000); }
-}
+    // Highlight the clicked tab 
+    if(id === 'home') document.querySelectorAll('button[onclick="switchTab(\'home\')

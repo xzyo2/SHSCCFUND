@@ -3,6 +3,7 @@ const SUPABASE_URL = 'https://tokedafadxogunwwetef.supabase.co'; // hello there 
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRva2VkYWZhZHhvZ3Vud3dldGVmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0Mzc4NTUsImV4cCI6MjA4MTAxMzg1NX0.HBS6hfKXt2g3oplwYoCg2t7qjqFyDMJvEmtlvgJSb3c';
 const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+
 // --- STATE ---
 let transactions = [];
 let currentPage = 0;
@@ -31,7 +32,10 @@ function toggleTheme() {
 function updateSortIcon() {
     const icon = document.getElementById('sortIcon');
     const isDark = document.body.classList.contains('dark-mode');
-    icon.src = isDark ? "img/sortdm.png" : "img/sortwm.png";
+    // Ensure you have these images in your img/ folder!
+    if (icon) {
+        icon.src = isDark ? "img/sortdm.png" : "img/sortwm.png";
+    }
 }
 
 // --- DATA FETCHING ---
@@ -62,30 +66,38 @@ async function fetchTransactions(isLoadMore = false) {
 
     const { data, error, count } = await query.range(from, to);
 
-    if (error) return showToast("Error loading data");
+    if (error) {
+        console.error("Supabase Error:", error);
+        return showToast("Error loading data");
+    }
 
     transactions = isLoadMore ? [...transactions, ...data] : data;
     data.forEach(t => renderCard(t));
     calculateBalance();
     
-    if(document.getElementById('transCount')) document.getElementById('transCount').innerText = `${count} records`;
+    if(document.getElementById('transCount')) {
+        document.getElementById('transCount').innerText = `${count} records`;
+    }
+    
     const loadBtn = document.getElementById('loadMoreBtn');
-    if(loadBtn) loadBtn.style.display = (to >= count - 1) ? 'none' : 'block';
+    if(loadBtn) {
+        loadBtn.style.display = (to >= count - 1) ? 'none' : 'block';
+    }
 }
 
-// --- RENDER CARD (Logic for Receipt/Warning) ---
+// --- RENDER CARD ---
 function renderCard(t) {
     const list = document.getElementById('transList');
     const isIncome = t.type === 'income';
     const amountFmt = parseFloat(t.amount).toLocaleString('en-PH', { minimumFractionDigits: 2 });
 
-    // 1. Receipt Badge (If image exists)
+    // 1. Receipt Badge
     let receiptBadge = '';
     if (t.receipt_url) {
         receiptBadge = `<a href="${t.receipt_url}" target="_blank" class="receipt-badge">VIEW RECEIPT</a>`;
     }
 
-    // 2. Red Warning Text (If NO image)
+    // 2. Warning Text
     let warningText = '';
     if (!t.receipt_url) {
         warningText = `<small class="no-receipt-text">Note: No receipt image attached. (Transaction verified manually)</small>`;
@@ -113,7 +125,7 @@ function renderCard(t) {
     list.appendChild(card);
 }
 
-// --- SUBMIT (With Image Upload) ---
+// --- SUBMIT TRANSACTION ---
 async function submitTransaction() {
     const id = document.getElementById('editId').value;
     const date = document.getElementById('tDate').value;
@@ -136,7 +148,11 @@ async function submitTransaction() {
     if (file) {
         const fileName = `${Date.now()}_${file.name.replace(/\s/g, '_')}`;
         const { error: uploadError } = await client.storage.from('receipts').upload(fileName, file);
-        if (uploadError) return showToast("Image upload failed");
+        
+        if (uploadError) {
+            console.error(uploadError);
+            return showToast("Image upload failed");
+        }
         
         const { data: urlData } = client.storage.from('receipts').getPublicUrl(fileName);
         finalReceiptUrl = urlData.publicUrl;
@@ -145,8 +161,11 @@ async function submitTransaction() {
     // Payload
     const payload = { 
         id: id ? id : undefined, 
-        date, description: desc, type: selectedType, amount,
-        ...(finalReceiptUrl && { receipt_url: finalReceiptUrl }) // Only add URL if new file exists
+        date, 
+        description: desc, 
+        type: selectedType, 
+        amount,
+        ...(finalReceiptUrl && { receipt_url: finalReceiptUrl }) 
     };
 
     const action = id ? 'update' : 'create';
@@ -157,290 +176,9 @@ async function submitTransaction() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ action, payload, password })
         });
+
         const result = await res.json();
+
         if (result.success) {
-            showToast("Success! Waiting for update...");
-            closeModal('transModal');
-            fileInput.value = ""; // Reset file input
-            document.getElementById('fileName').innerText = "Tap to upload image...";
-        } else {
-            showToast("Error: " + (result.message || result.error));
-        }
-    } catch (e) { showToast("Server Connection Failed"); }
-}
-
-// --- OTHER ACTIONS ---
-async function deleteTransaction() {
-    const id = document.getElementById('editId').value;
-    const password = document.getElementById('adminPass').value;
-    if(!confirm("Delete this record?")) return;
-    if (!password) return showToast("Please login again");
-
-    try {
-        const res = await fetch('/api/transaction', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'delete', payload: { id }, password })
-        });
-        const result = await res.json();
-        if (result.success) {
-            showToast("Deleted. Waiting for update...");
-            closeModal('transModal');
-        } else { showToast("Error deleting"); }
-    } catch (e) { showToast("Server Error"); }
-}
-
-function setupRealtime() {
-    client.channel('public:transactions')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, () => fetchTransactions())
-        .subscribe();
-}
-
-async function calculateBalance() {
-    const { data } = await client.from('transactions').select('amount, type');
-    let total = 0;
-    if(data) {
-        data.forEach(t => {
-            if(t.type === 'income') total += parseFloat(t.amount);
-            else total -= parseFloat(t.amount);
-        });
-    }
-    animateValue(displayedBalance, total, 2000); 
-    displayedBalance = total;
-}
-
-function animateValue(start, end, duration) {
-    if (start === end) return;
-    const el = document.getElementById("displayBalance");
-    let startTime = null;
-    function step(ts) {
-        if (!startTime) startTime = ts;
-        const progress = Math.min((ts - startTime) / duration, 1);
-        const easeOut = 1 - Math.pow(1 - progress, 3);
-        const current = start + (end - start) * easeOut;
-        el.innerHTML = current.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        if (progress < 1) requestAnimationFrame(step);
-        else el.innerHTML = end.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    }
-    requestAnimationFrame(step);
-}
-
-// --- UI UTILS ---
-function toggleAdminMode() {
-    isAdminMode = !isAdminMode;
-    const btn = document.getElementById('adminToggleBtn');
-    const list = document.getElementById('transList');
-    const controls = document.getElementById('adminControls');
-    
-    if (isAdminMode) {
-        btn.innerText = "Admin Mode: ON";
-        btn.style.color = "#22c55e";
-        list.classList.add('admin-mode');
-        if(controls) controls.classList.remove('hidden');
-    } else {
-        btn.innerText = "Admin Mode: OFF";
-        btn.style.color = "#eab308";
-        list.classList.remove('admin-mode');
-        if(controls) controls.classList.add('hidden');
-    }
-}
-
-async function downloadBackup() {
-    if(!confirm("Download backup?")) return;
-    const { data, error } = await client.from('transactions').select('*').order('id', { ascending: true });
-    if (error) return showToast("Backup failed.");
-    let csv = "ID,Date,Description,Type,Amount,ReceiptURL,Created At\n";
-    data.forEach(row => {
-        const cleanDesc = row.description ? row.description.replace(/"/g, '""') : ""; 
-        csv += `${row.id},${row.date},"${cleanDesc}",${row.type},${row.amount},${row.receipt_url || ''},${row.created_at}\n`;
-    });
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `SHS_Backup_${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
-    showToast("Backup Downloaded! 📂");
-}
-
-function openTransactionModal() {
-    document.getElementById('modalTitle').innerText = "New Transaction";
-    document.getElementById('editId').value = "";
-    document.getElementById('tDesc').value = "";
-    document.getElementById('tAmount').value = "";
-    document.getElementById('tReceipt').value = ""; // Reset file
-    document.getElementById('fileName').innerText = "Tap to upload image...";
-    document.getElementById('deleteBtn').classList.add('hidden');
-    setTransType('income');
-    document.getElementById('transModal').style.display = 'flex';
-}
-
-function openEditModal(id) {
-    const t = transactions.find(x => x.id === id);
-    if(!t) return;
-    document.getElementById('modalTitle').innerText = `Edit Transaction #${id}`;
-    document.getElementById('editId').value = id;
-    document.getElementById('tDate').value = t.date;
-    document.getElementById('tDesc').value = t.description;
-    document.getElementById('tAmount').value = t.amount;
-    document.getElementById('fileName').innerText = t.receipt_url ? "Replace existing image..." : "Upload image...";
-    document.getElementById('deleteBtn').classList.remove('hidden');
-    setTransType(t.type);
-    document.getElementById('transModal').style.display = 'flex';
-}
-
-function setTransType(type) {
-    selectedType = type;
-    document.getElementById('btnIncome').className = `type-btn ${type === 'income' ? 'active' : ''}`;
-    document.getElementById('btnExpense').className = `type-btn ${type === 'expense' ? 'active' : ''}`;
-}
-
-// File name helper
-document.getElementById('tReceipt')?.addEventListener('change', function(){
-    if(this.files && this.files[0]) document.getElementById('fileName').innerText = this.files[0].name;
-});
-
-// Auth & Tabs
-async function attemptLogin() {
-    const u = document.getElementById('adminUser').value;
-    const p = document.getElementById('adminPass').value;
-    try {
-        const res = await fetch('/api/auth', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ user: u, pass: p })
-        });
-        const data = await res.json();
-        if(data.success) {
-            localStorage.setItem('sc_admin', 'true');
-            checkLoginSession();
-            closeModal('loginModal');
-            showToast("Welcome Treasurer");
-            if(!isAdminMode) toggleAdminMode();
-        } else { showToast("Wrong password"); }
-    } catch(e) { showToast("Server Error"); }
-}
-
-function handleLogout() {
-    localStorage.removeItem('sc_admin');
-    checkLoginSession();
-    if(isAdminMode) toggleAdminMode();
-    document.getElementById('adminPass').value = ""; 
-    showToast("Logged out");
-}
-
-function checkLoginSession() {
-    const isLogged = localStorage.getItem('sc_admin') === 'true';
-    if(isLogged) {
-        document.getElementById('loginBtn').classList.add('hidden');
-        document.getElementById('logoutBtn').classList.remove('hidden');
-        document.getElementById('adminToggleBtn').classList.remove('hidden');
-    } else {
-        document.getElementById('loginBtn').classList.remove('hidden');
-        document.getElementById('logoutBtn').classList.add('hidden');
-        document.getElementById('adminToggleBtn').classList.add('hidden');
-    }
-}
-
-function switchTab(id) {
-    document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
-    document.getElementById(id).classList.remove('hidden');
-    document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
-    if(id === 'home') document.querySelectorAll('button[onclick="switchTab(\'home\')"]').forEach(b => b.classList.add('active'));
-    if(id === 'be-heard') document.querySelectorAll('button[onclick="switchTab(\'be-heard\')"]').forEach(b => b.classList.add('active'));
-}
-
-function toggleFilterMenu() { document.getElementById('filterMenu').classList.toggle('hidden'); }
-function applyFilter(type) {
-    currentFilter = type;
-    document.querySelectorAll('.filter-chip').forEach(btn => btn.classList.remove('active'));
-    document.getElementById(`filter-${type}`).classList.add('active');
-    fetchTransactions(false);
-}
-
-function openLogin() { document.getElementById('loginModal').style.display = 'flex'; }
-function closeModal(id) { document.getElementById(id).style.display = 'none'; }
-function loadMore() { currentPage++; fetchTransactions(true); }
-function showToast(msg) {
-    const t = document.getElementById('toast');
-    if(t) { t.innerText = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 3000); }
-}  document.getElementById('transModal').style.display = 'flex';
-}
-
-function openEditModal(id) {
-    const t = transactions.find(x => x.id === id);
-    if(!t) return;
-    document.getElementById('modalTitle').innerText = `Edit Transaction #${id}`;
-    document.getElementById('editId').value = id;
-    document.getElementById('tDate').value = t.date;
-    document.getElementById('tDesc').value = t.description;
-    document.getElementById('tAmount').value = t.amount;
-    document.getElementById('deleteBtn').classList.remove('hidden');
-    setTransType(t.type);
-    document.getElementById('transModal').style.display = 'flex';
-}
-
-function setTransType(type) {
-    selectedType = type;
-    document.getElementById('btnIncome').className = `type-btn ${type === 'income' ? 'active' : ''}`;
-    document.getElementById('btnExpense').className = `type-btn ${type === 'expense' ? 'active' : ''}`;
-}
-
-async function attemptLogin() {
-    const u = document.getElementById('adminUser').value;
-    const p = document.getElementById('adminPass').value;
-    try {
-        const res = await fetch('/api/auth', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ user: u, pass: p })
-        });
-        const data = await res.json();
-        if(data.success) {
-            localStorage.setItem('sc_admin', 'true');
-            checkLoginSession();
-            closeModal('loginModal');
-            showToast("Welcome Treasurer");
-            if(!isAdminMode) toggleAdminMode();
-        } else {
-            showToast("Wrong password");
-        }
-    } catch(e) { showToast("Server Error"); }
-}
-
-function handleLogout() {
-    localStorage.removeItem('sc_admin');
-    checkLoginSession();
-    if(isAdminMode) toggleAdminMode();
-    document.getElementById('adminPass').value = ""; 
-    showToast("Logged out");
-}
-
-function checkLoginSession() {
-    const isLogged = localStorage.getItem('sc_admin') === 'true';
-    if(isLogged) {
-        document.getElementById('loginBtn').classList.add('hidden');
-        document.getElementById('logoutBtn').classList.remove('hidden');
-        document.getElementById('adminToggleBtn').classList.remove('hidden');
-    } else {
-        document.getElementById('loginBtn').classList.remove('hidden');
-        document.getElementById('logoutBtn').classList.add('hidden');
-        document.getElementById('adminToggleBtn').classList.add('hidden');
-    }
-}
-
-function switchTab(id) {
-    document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
-    document.getElementById(id).classList.remove('hidden');
-    document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
-    if(id === 'home') document.querySelector('button[onclick="switchTab(\'home\')"]')?.classList.add('active');
-    if(id === 'be-heard') document.querySelector('button[onclick="switchTab(\'be-heard\')"]')?.classList.add('active');
-}
-
-function openLogin() { document.getElementById('loginModal').style.display = 'flex'; }
-function closeModal(id) { document.getElementById(id).style.display = 'none'; }
-function loadMore() { currentPage++; fetchTransactions(true); }
-function showToast(msg) {
-    const t = document.getElementById('toast');
-    if(t) { t.innerText = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 3000); }
-}
+            showToast("Success
 

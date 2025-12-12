@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Student Council Public Funds</title>
+    <title>Student Council Treasury</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
@@ -11,24 +11,20 @@
 <body class="dark-mode">
 
     <header>
-        <div class="logo">SC Funds</div>
-        <nav>
-            <button onclick="switchTab('home')" class="nav-btn active">Funds</button>
-            <button onclick="switchTab('be-heard')" class="nav-btn">Be Heard</button>
-            <button id="adminToggleBtn" class="nav-btn hidden special" onclick="toggleAdminMode()">Admin Mode: OFF</button>
-        </nav>
-        <div class="header-actions">
-            <button id="themeBtn" onclick="toggleTheme()" title="Switch Theme">
-                <div class="theme-icon"></div>
-            </button>
-            
-            <button id="loginBtn" onclick="openLogin()" title="Admin Login">
-                <img src="img/adminico.png" alt="Login" class="icon-img">
-            </button>
-            
-            <button id="logoutBtn" class="hidden" onclick="handleLogout()" title="Logout">
-                Logout
-            </button>
+        <div class="logo">SC Treasury</div>
+        <button id="themeBtn" onclick="toggleTheme()" title="Switch Theme">
+            <div class="theme-icon"></div>
+        </button>
+
+        <div class="desktop-nav">
+            <div class="header-actions">
+                <button id="loginBtn" onclick="openLogin()" title="Admin Login">
+                    <img src="img/adminico.png" alt="Login" class="icon-img">
+                </button>
+                <button id="logoutBtn" class="hidden" onclick="handleLogout()" title="Logout">
+                    Logout
+                </button>
+            </div>
         </div>
     </header>
 
@@ -61,7 +57,9 @@
                 <button onclick="applyFilter('week')" id="filter-week" class="filter-chip">This Week</button>
             </div>
 
-            <div id="transList" class="transaction-list"></div>
+            <div id="transList" class="transaction-list">
+                </div>
+
             <button id="loadMoreBtn" class="load-more" onclick="loadMore()">View More History</button>
         </div>
 
@@ -73,10 +71,18 @@
         </div>
     </div>
 
+    <nav class="mobile-nav">
+        <button onclick="switchTab('home')" class="nav-btn active">Funds</button>
+        <button onclick="switchTab('be-heard')" class="nav-btn">Be Heard</button>
+    </nav>
+    
+    <button id="adminToggleBtn" class="hidden special mobile-float-btn" onclick="toggleAdminMode()">Admin Mode: OFF</button>
+
+
     <div id="loginModal" class="modal">
         <div class="modal-box">
             <span class="close-btn" onclick="closeModal('loginModal')">&times;</span>
-            <h2>Login</h2>
+            <h2>Treasurer Access</h2>
             <input type="text" id="adminUser" placeholder="Username">
             <input type="password" id="adminPass" placeholder="Password">
             <button class="primary-btn" onclick="attemptLogin()">Verify Identity</button>
@@ -88,17 +94,28 @@
             <span class="close-btn" onclick="closeModal('transModal')">&times;</span>
             <h2 id="modalTitle">New Transaction</h2>
             <input type="hidden" id="editId">
+            
             <label>Date</label>
             <input type="date" id="tDate">
+            
             <label>Description</label>
             <input type="text" id="tDesc" placeholder="Description">
+            
             <label>Type</label>
             <div class="toggle-group">
                 <button id="btnIncome" class="type-btn active" onclick="setTransType('income')">Income</button>
                 <button id="btnExpense" class="type-btn" onclick="setTransType('expense')">Expense</button>
             </div>
+            
             <label>Amount (PHP)</label>
             <input type="number" id="tAmount" placeholder="0.00">
+
+            <label>Receipt Proof (Optional)</label>
+            <div class="file-upload-box">
+                <input type="file" id="tReceipt" accept="image/*">
+                <span id="fileName">Tap to upload image...</span>
+            </div>
+
             <button class="primary-btn" onclick="submitTransaction()">Save Transaction</button>
             <button id="deleteBtn" class="delete-btn hidden" onclick="deleteTransaction()">Delete Record</button>
         </div>
@@ -108,4 +125,3 @@
     <script src="script.js"></script>
 </body>
 </html>
-

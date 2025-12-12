@@ -1,5 +1,4 @@
 // --- CONFIGURATION ---
-// ⚠️ REPLACE WITH YOUR ACTUAL SUPABASE KEYS
 const SUPABASE_URL = 'https://tokedafadxogunwwetef.supabase.co'; 
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRva2VkYWZhZHhvZ3Vud3dldGVmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0Mzc4NTUsImV4cCI6MjA4MTAxMzg1NX0.HBS6hfKXt2g3oplwYoCg2t7qjqFyDMJvEmtlvgJSb3c';
 
@@ -24,7 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if(dateInput) dateInput.valueAsDate = new Date();
 });
 
-// --- THEME & ICONS ---
+// --- THEME ---
 function toggleTheme() {
     const body = document.body;
     if (body.classList.contains('dark-mode')) {
@@ -95,19 +94,17 @@ async function fetchTransactions(isLoadMore = false) {
     }
 }
 
-// --- RENDER CARD (With Receipt Logic) ---
+// --- RENDER CARD ---
 function renderCard(t) {
     const list = document.getElementById('transList');
     const isIncome = t.type === 'income';
     const amountFmt = parseFloat(t.amount).toLocaleString('en-PH', { minimumFractionDigits: 2 });
 
-    // 1. Receipt Badge
     let receiptBadge = '';
     if (t.receipt_url) {
         receiptBadge = `<a href="${t.receipt_url}" target="_blank" class="receipt-badge">VIEW RECEIPT</a>`;
     }
 
-    // 2. Warning Text
     let warningText = '';
     if (!t.receipt_url) {
         warningText = `<small class="no-receipt-text">Note: No receipt image attached. (Transaction verified manually)</small>`;
@@ -135,15 +132,14 @@ function renderCard(t) {
     list.appendChild(card);
 }
 
-// --- SUBMIT TRANSACTION (With Image Upload) ---
+// --- SUBMIT TRANSACTION ---
 async function submitTransaction() {
     const id = document.getElementById('editId').value;
     const date = document.getElementById('tDate').value;
     const desc = document.getElementById('tDesc').value;
     const amount = document.getElementById('tAmount').value;
     const password = document.getElementById('adminPass').value; 
-
-    // File Handling
+    
     const fileInput = document.getElementById('tReceipt');
     const file = fileInput ? fileInput.files[0] : null;
 
@@ -154,21 +150,21 @@ async function submitTransaction() {
 
     let finalReceiptUrl = null;
 
-    // Upload Image if present
     if (file) {
-        const fileName = `${Date.now()}_${file.name.replace(/\s/g, '_')}`;
+        const cleanName = file.name.replace(/[^a-zA-Z0-9.]/g, '_');
+        const fileName = `${Date.now()}_${cleanName}`;
+        
         const { error: uploadError } = await client.storage.from('receipts').upload(fileName, file);
         
         if (uploadError) {
-            console.error(uploadError);
-            return showToast("Image upload failed");
+            console.error("Upload Error:", uploadError);
+            return showToast("Image upload failed. Check permissions.");
         }
         
         const { data: urlData } = client.storage.from('receipts').getPublicUrl(fileName);
         finalReceiptUrl = urlData.publicUrl;
     }
 
-    // Payload
     const payload = { 
         id: id ? id : undefined, 
         date, 
@@ -177,7 +173,6 @@ async function submitTransaction() {
         amount
     };
 
-    // Only add receipt_url if a new image was uploaded
     if (finalReceiptUrl) {
         payload.receipt_url = finalReceiptUrl;
     }
@@ -196,10 +191,7 @@ async function submitTransaction() {
         if (result.success) {
             showToast("Success! Waiting for update...");
             closeModal('transModal');
-            if(fileInput) fileInput.value = ""; 
-            if(document.getElementById('fileName')) {
-                document.getElementById('fileName').innerText = "Tap to upload image...";
-            }
+            clearFileSelection(null); 
         } else {
             showToast("Error: " + (result.message || result.error));
         }
@@ -209,11 +201,39 @@ async function submitTransaction() {
     }
 }
 
+// --- CLEAR FILE HELPER ---
+function clearFileSelection(e) {
+    if(e) e.preventDefault(); 
+    
+    const fileInput = document.getElementById('tReceipt');
+    const fileNameDisplay = document.getElementById('fileName');
+    const clearBtn = document.getElementById('clearFileBtn');
+    
+    if(fileInput) fileInput.value = ""; 
+    if(fileNameDisplay) fileNameDisplay.innerText = "Tap to upload image...";
+    if(clearBtn) clearBtn.classList.add('hidden'); 
+}
+
+// --- FILE LISTENER ---
+const receiptInput = document.getElementById('tReceipt');
+if (receiptInput) {
+    receiptInput.addEventListener('change', function(){
+        const fileNameDisplay = document.getElementById('fileName');
+        const clearBtn = document.getElementById('clearFileBtn');
+
+        if(this.files && this.files[0]) {
+            fileNameDisplay.innerText = this.files[0].name;
+            clearBtn.classList.remove('hidden'); 
+        } else {
+            clearFileSelection(null);
+        }
+    });
+}
+
 // --- DELETE TRANSACTION ---
 async function deleteTransaction() {
     const id = document.getElementById('editId').value;
     const password = document.getElementById('adminPass').value;
-
     if(!confirm("Are you sure?")) return;
     if (!password) return showToast("Please login again");
 
@@ -235,14 +255,14 @@ async function deleteTransaction() {
 
 // --- REALTIME ---
 function setupRealtime() {
-    const channel = client.channel('public:transactions')
+    client.channel('public:transactions')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, () => {
         fetchTransactions(); 
     })
     .subscribe();
 }
 
-// --- BALANCE ANIMATION ---
+// --- BALANCE ---
 async function calculateBalance() {
     const { data } = await client.from('transactions').select('amount, type');
     let total = 0;
@@ -260,7 +280,6 @@ function animateValue(start, end, duration) {
     if (start === end) return;
     const element = document.getElementById("displayBalance");
     if (!element) return;
-
     let startTime = null;
     function step(timestamp) {
         if (!startTime) startTime = timestamp;
@@ -274,7 +293,7 @@ function animateValue(start, end, duration) {
     window.requestAnimationFrame(step);
 }
 
-// --- UI / ADMIN UTILS ---
+// --- UI UTILS ---
 function toggleAdminMode() {
     isAdminMode = !isAdminMode;
     const btn = document.getElementById('adminToggleBtn');
@@ -320,12 +339,7 @@ function openTransactionModal() {
     document.getElementById('tDesc').value = "";
     document.getElementById('tAmount').value = "";
     
-    // Reset file input
-    const fileInput = document.getElementById('tReceipt');
-    if(fileInput) fileInput.value = "";
-    if(document.getElementById('fileName')) {
-        document.getElementById('fileName').innerText = "Tap to upload image...";
-    }
+    clearFileSelection(null); 
 
     document.getElementById('deleteBtn').classList.add('hidden');
     setTransType('income');
@@ -343,6 +357,7 @@ function openEditModal(id) {
     
     if(document.getElementById('fileName')) {
         document.getElementById('fileName').innerText = t.receipt_url ? "Replace existing image..." : "Upload image...";
+        document.getElementById('clearFileBtn').classList.add('hidden');
     }
 
     document.getElementById('deleteBtn').classList.remove('hidden');
@@ -356,20 +371,9 @@ function setTransType(type) {
     document.getElementById('btnExpense').className = `type-btn ${type === 'expense' ? 'active' : ''}`;
 }
 
-// File name helper
-const receiptInput = document.getElementById('tReceipt');
-if (receiptInput) {
-    receiptInput.addEventListener('change', function(){
-        if(this.files && this.files[0]) {
-            document.getElementById('fileName').innerText = this.files[0].name;
-        }
-    });
-}
-
-// --- AUTH & TABS ---
+// --- AUTH ---
 function toggleFilterMenu() {
-    const menu = document.getElementById('filterMenu');
-    menu.classList.toggle('hidden');
+    document.getElementById('filterMenu').classList.toggle('hidden');
 }
 
 function applyFilter(type) {

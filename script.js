@@ -469,8 +469,6 @@ function switchTab(id) {
     activeButtons.forEach(btn => btn.classList.add('active'));
 }
 
-// --- MISSING HELPERS ADDED BELOW ---
-
 function openLogin() {
     const modal = document.getElementById('loginModal');
     if(modal) modal.style.display = 'flex';
@@ -481,8 +479,57 @@ function closeModal(modalId) {
     if(modal) modal.style.display = 'none';
 }
 
+// --- CUSTOM TOAST NOTIFICATION ---
 function showToast(message) {
-    // Basic Alert as fallback, or custom logic if you have a toast div
-    // If you have a specific toast element, replace this alert
-    alert(message); 
+    // 1. Create container if not exists
+    let container = document.getElementById('toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toast-container';
+        // Base styles to ensure it floats above everything
+        container.style.position = 'fixed';
+        container.style.bottom = '20px';
+        container.style.left = '50%';
+        container.style.transform = 'translateX(-50%)';
+        container.style.zIndex = '9999';
+        container.style.display = 'flex';
+        container.style.flexDirection = 'column';
+        container.style.gap = '10px';
+        container.style.pointerEvents = 'none'; // Click through container
+        document.body.appendChild(container);
+    }
+
+    // 2. Create the toast element
+    const toast = document.createElement('div');
+    toast.innerText = message;
+    
+    // 3. Styling (Inline to guarantee it works without extra CSS)
+    toast.style.background = 'rgba(30, 30, 30, 0.9)';
+    toast.style.color = '#fff';
+    toast.style.padding = '12px 24px';
+    toast.style.borderRadius = '25px';
+    toast.style.fontFamily = 'sans-serif';
+    toast.style.fontSize = '14px';
+    toast.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+    toast.style.backdropFilter = 'blur(4px)';
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(10px)';
+    toast.style.transition = 'all 0.3s ease';
+
+    container.appendChild(toast);
+
+    // 4. Animate In
+    requestAnimationFrame(() => {
+        toast.style.opacity = '1';
+        toast.style.transform = 'translateY(0)';
+    });
+
+    // 5. Remove after 3 seconds
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(10px)';
+        setTimeout(() => {
+            toast.remove();
+        }, 300);
+    }, 3000);
 }

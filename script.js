@@ -1,7 +1,7 @@
 // --- CONFIGURATION ---
-const SUPABASE_URL = 'https://tokedafadxogunwwetef.supabase.co'; // hello there user
+// ⚠️ REPLACE WITH YOUR ACTUAL SUPABASE KEYS
+const SUPABASE_URL = 'https://tokedafadxogunwwetef.supabase.co'; 
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRva2VkYWZhZHhvZ3Vud3dldGVmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0Mzc4NTUsImV4cCI6MjA4MTAxMzg1NX0.HBS6hfKXt2g3oplwYoCg2t7qjqFyDMJvEmtlvgJSb3c';
-
 
 const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -24,10 +24,16 @@ document.addEventListener('DOMContentLoaded', () => {
     if(dateInput) dateInput.valueAsDate = new Date();
 });
 
-// --- THEME FUNCTIONS ---
+// --- THEME & ICONS ---
 function toggleTheme() {
-    document.body.classList.toggle('dark-mode');
-    document.body.classList.toggle('light-mode');
+    const body = document.body;
+    if (body.classList.contains('dark-mode')) {
+        body.classList.remove('dark-mode');
+        body.classList.add('light-mode');
+    } else {
+        body.classList.remove('light-mode');
+        body.classList.add('dark-mode');
+    }
     updateSortIcon();
 }
 
@@ -49,19 +55,21 @@ async function fetchTransactions(isLoadMore = false) {
     const from = currentPage * 10;
     const to = from + 9;
 
-    let query = client.from('transactions')
+    let query = client
+        .from('transactions')
         .select('*', { count: 'exact' })
         .order('date', { ascending: false })
         .order('id', { ascending: false });
 
-    // Filter Logic
     if (currentFilter === 'month') {
         const date = new Date();
         const firstDay = new Date(date.getFullYear(), date.getMonth(), 1).toISOString();
         query = query.gte('date', firstDay);
-    } else if (currentFilter === 'week') {
+    } 
+    else if (currentFilter === 'week') {
         const date = new Date();
-        const diff = date.getDate() - date.getDay();
+        const day = date.getDay();
+        const diff = date.getDate() - day;
         const firstDay = new Date(date.setDate(diff)).toISOString();
         query = query.gte('date', firstDay);
     }
@@ -77,7 +85,6 @@ async function fetchTransactions(isLoadMore = false) {
     data.forEach(t => renderCard(t));
     calculateBalance();
     
-    // UI Updates
     if(document.getElementById('transCount')) {
         document.getElementById('transCount').innerText = `${count} records`;
     }
@@ -88,19 +95,19 @@ async function fetchTransactions(isLoadMore = false) {
     }
 }
 
-// --- RENDER CARD ---
+// --- RENDER CARD (With Receipt Logic) ---
 function renderCard(t) {
     const list = document.getElementById('transList');
     const isIncome = t.type === 'income';
     const amountFmt = parseFloat(t.amount).toLocaleString('en-PH', { minimumFractionDigits: 2 });
 
-    // Receipt Badge Logic
+    // 1. Receipt Badge
     let receiptBadge = '';
     if (t.receipt_url) {
         receiptBadge = `<a href="${t.receipt_url}" target="_blank" class="receipt-badge">VIEW RECEIPT</a>`;
     }
 
-    // Warning Text Logic
+    // 2. Warning Text
     let warningText = '';
     if (!t.receipt_url) {
         warningText = `<small class="no-receipt-text">Note: No receipt image attached. (Transaction verified manually)</small>`;
@@ -108,7 +115,6 @@ function renderCard(t) {
 
     const card = document.createElement('div');
     card.className = 'trans-card';
-    // Using HTML Entity &#8369; for Peso sign to prevent syntax errors
     card.innerHTML = `
         <div class="t-left">
             <span class="t-id">#${t.id}</span>
@@ -129,14 +135,15 @@ function renderCard(t) {
     list.appendChild(card);
 }
 
-// --- SUBMIT TRANSACTION ---
+// --- SUBMIT TRANSACTION (With Image Upload) ---
 async function submitTransaction() {
     const id = document.getElementById('editId').value;
     const date = document.getElementById('tDate').value;
     const desc = document.getElementById('tDesc').value;
     const amount = document.getElementById('tAmount').value;
     const password = document.getElementById('adminPass').value; 
-    
+
+    // File Handling
     const fileInput = document.getElementById('tReceipt');
     const file = fileInput ? fileInput.files[0] : null;
 
@@ -147,7 +154,7 @@ async function submitTransaction() {
 
     let finalReceiptUrl = null;
 
-    // Upload Image
+    // Upload Image if present
     if (file) {
         const fileName = `${Date.now()}_${file.name.replace(/\s/g, '_')}`;
         const { error: uploadError } = await client.storage.from('receipts').upload(fileName, file);
@@ -161,7 +168,7 @@ async function submitTransaction() {
         finalReceiptUrl = urlData.publicUrl;
     }
 
-    // Construct Payload
+    // Payload
     const payload = { 
         id: id ? id : undefined, 
         date, 
@@ -169,7 +176,7 @@ async function submitTransaction() {
         type: selectedType, 
         amount
     };
-    
+
     // Only add receipt_url if a new image was uploaded
     if (finalReceiptUrl) {
         payload.receipt_url = finalReceiptUrl;
@@ -189,7 +196,7 @@ async function submitTransaction() {
         if (result.success) {
             showToast("Success! Waiting for update...");
             closeModal('transModal');
-            if (fileInput) fileInput.value = ""; 
+            if(fileInput) fileInput.value = ""; 
             if(document.getElementById('fileName')) {
                 document.getElementById('fileName').innerText = "Tap to upload image...";
             }
@@ -206,8 +213,8 @@ async function submitTransaction() {
 async function deleteTransaction() {
     const id = document.getElementById('editId').value;
     const password = document.getElementById('adminPass').value;
-    
-    if(!confirm("Delete this record?")) return;
+
+    if(!confirm("Are you sure?")) return;
     if (!password) return showToast("Please login again");
 
     try {
@@ -216,7 +223,6 @@ async function deleteTransaction() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ action: 'delete', payload: { id }, password })
         });
-
         const result = await res.json();
         if (result.success) {
             showToast("Deleted. Waiting for update...");
@@ -224,18 +230,16 @@ async function deleteTransaction() {
         } else {
             showToast("Error deleting");
         }
-    } catch (e) {
-        showToast("Server Error");
-    }
+    } catch (e) { showToast("Server Error"); }
 }
 
 // --- REALTIME ---
 function setupRealtime() {
-    client.channel('public:transactions')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, () => {
-            fetchTransactions(); 
-        })
-        .subscribe();
+    const channel = client.channel('public:transactions')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, () => {
+        fetchTransactions(); 
+    })
+    .subscribe();
 }
 
 // --- BALANCE ANIMATION ---
@@ -254,23 +258,23 @@ async function calculateBalance() {
 
 function animateValue(start, end, duration) {
     if (start === end) return;
-    const el = document.getElementById("displayBalance");
-    if (!el) return;
-    
+    const element = document.getElementById("displayBalance");
+    if (!element) return;
+
     let startTime = null;
-    function step(ts) {
-        if (!startTime) startTime = ts;
-        const progress = Math.min((ts - startTime) / duration, 1);
+    function step(timestamp) {
+        if (!startTime) startTime = timestamp;
+        const progress = Math.min((timestamp - startTime) / duration, 1);
         const easeOut = 1 - Math.pow(1 - progress, 3);
         const current = start + (end - start) * easeOut;
-        el.innerHTML = current.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        if (progress < 1) requestAnimationFrame(step);
-        else el.innerHTML = end.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        element.innerHTML = current.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        if (progress < 1) window.requestAnimationFrame(step);
+        else element.innerHTML = end.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
-    requestAnimationFrame(step);
+    window.requestAnimationFrame(step);
 }
 
-// --- UI UTILS ---
+// --- UI / ADMIN UTILS ---
 function toggleAdminMode() {
     isAdminMode = !isAdminMode;
     const btn = document.getElementById('adminToggleBtn');
@@ -293,21 +297,19 @@ function toggleAdminMode() {
 async function downloadBackup() {
     if(!confirm("Download backup?")) return;
     const { data, error } = await client.from('transactions').select('*').order('id', { ascending: true });
-    
     if (error) return showToast("Backup failed.");
-    
-    // Explicit newline character \n for CSV safety
-    let csv = "ID,Date,Description,Type,Amount,ReceiptURL,Created At\n";
+
+    let csvContent = "ID,Date,Description,Type,Amount,ReceiptURL,Created At\n";
     data.forEach(row => {
         const cleanDesc = row.description ? row.description.replace(/"/g, '""') : ""; 
         const rUrl = row.receipt_url || '';
-        csv += `${row.id},${row.date},"${cleanDesc}",${row.type},${row.amount},${rUrl},${row.created_at}\n`;
+        csvContent += `${row.id},${row.date},"${cleanDesc}",${row.type},${row.amount},${rUrl},${row.created_at}\n`;
     });
-    
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = `SHS_Backup_${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `SHS_Treasury_Backup_${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
     showToast("Backup Downloaded! 📂");
 }
@@ -317,10 +319,14 @@ function openTransactionModal() {
     document.getElementById('editId').value = "";
     document.getElementById('tDesc').value = "";
     document.getElementById('tAmount').value = "";
-    document.getElementById('tReceipt').value = ""; 
+    
+    // Reset file input
+    const fileInput = document.getElementById('tReceipt');
+    if(fileInput) fileInput.value = "";
     if(document.getElementById('fileName')) {
         document.getElementById('fileName').innerText = "Tap to upload image...";
     }
+
     document.getElementById('deleteBtn').classList.add('hidden');
     setTransType('income');
     document.getElementById('transModal').style.display = 'flex';
@@ -329,7 +335,6 @@ function openTransactionModal() {
 function openEditModal(id) {
     const t = transactions.find(x => x.id === id);
     if(!t) return;
-    
     document.getElementById('modalTitle').innerText = `Edit Transaction #${id}`;
     document.getElementById('editId').value = id;
     document.getElementById('tDate').value = t.date;
@@ -339,7 +344,7 @@ function openEditModal(id) {
     if(document.getElementById('fileName')) {
         document.getElementById('fileName').innerText = t.receipt_url ? "Replace existing image..." : "Upload image...";
     }
-    
+
     document.getElementById('deleteBtn').classList.remove('hidden');
     setTransType(t.type);
     document.getElementById('transModal').style.display = 'flex';
@@ -361,11 +366,22 @@ if (receiptInput) {
     });
 }
 
-// Auth & Tabs
+// --- AUTH & TABS ---
+function toggleFilterMenu() {
+    const menu = document.getElementById('filterMenu');
+    menu.classList.toggle('hidden');
+}
+
+function applyFilter(type) {
+    currentFilter = type;
+    document.querySelectorAll('.filter-chip').forEach(btn => btn.classList.remove('active'));
+    document.getElementById(`filter-${type}`).classList.add('active');
+    fetchTransactions(false);
+}
+
 async function attemptLogin() {
     const u = document.getElementById('adminUser').value;
     const p = document.getElementById('adminPass').value;
-    
     try {
         const res = await fetch('/api/auth', {
             method: 'POST',
@@ -373,7 +389,6 @@ async function attemptLogin() {
             body: JSON.stringify({ user: u, pass: p })
         });
         const data = await res.json();
-        
         if(data.success) {
             localStorage.setItem('sc_admin', 'true');
             checkLoginSession();
@@ -411,31 +426,14 @@ function switchTab(id) {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
     document.getElementById(id).classList.remove('hidden');
     document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
-    
     if(id === 'home') document.querySelectorAll('button[onclick="switchTab(\'home\')"]').forEach(b => b.classList.add('active'));
     if(id === 'be-heard') document.querySelectorAll('button[onclick="switchTab(\'be-heard\')"]').forEach(b => b.classList.add('active'));
-}
-
-function toggleFilterMenu() { 
-    document.getElementById('filterMenu').classList.toggle('hidden'); 
-}
-
-function applyFilter(type) {
-    currentFilter = type;
-    document.querySelectorAll('.filter-chip').forEach(btn => btn.classList.remove('active'));
-    document.getElementById(`filter-${type}`).classList.add('active');
-    fetchTransactions(false);
 }
 
 function openLogin() { document.getElementById('loginModal').style.display = 'flex'; }
 function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 function loadMore() { currentPage++; fetchTransactions(true); }
-
 function showToast(msg) {
     const t = document.getElementById('toast');
-    if(t) { 
-        t.innerText = msg; 
-        t.classList.add('show'); 
-        setTimeout(() => t.classList.remove('show'), 3000); 
-    }
+    if(t) { t.innerText = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 3000); }
 }
